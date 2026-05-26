@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>星座開運胖胖貓 銷售分析報告</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600;700&family=Noto+Sans+TC:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --gold: #C9962A;
+    --gold-light: #F0C84A;
+    --gold-pale: #FDF3D6;
+    --ink: #1A1410;
+    --ink-mid: #3D2F1E;
+    --ink-soft: #7A6A55;
+    --cream: #FAF6EE;
+    --cream-warm: #F3EBD8;
+    --blue: #2B5FA6;
+    --blue-light: #4A7FCB;
+    --orange: #C45A1A;
+    --orange-light: #E07A3A;
+    --divider: rgba(201,150,42,0.25);
+  }
+
+  body {
+    background: var(--cream);
+    color: var(--ink);
+    font-family: 'Noto Sans TC', sans-serif;
+    font-weight: 400;
+    min-height: 100vh;
+    position: relative;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 50% at 10% 10%, rgba(201,150,42,0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 60% at 90% 80%, rgba(43,95,166,0.05) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 56px 40px 80px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding-bottom: 28px;
+    border-bottom: 1.5px solid var(--divider);
+    margin-bottom: 40px;
+  }
+
+  .brand-tag {
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--gold);
+    font-weight: 500;
+    margin-bottom: 10px;
+  }
+
+  h1 {
+    font-family: 'Noto Serif TC', serif;
+    font-size: 36px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.2;
+    letter-spacing: -0.5px;
+  }
+
+  h1 span {
+    color: var(--gold);
+  }
+
+  .header-meta {
+    text-align: right;
+  }
+
+  .report-date {
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin-bottom: 6px;
+  }
+
+  .date-range {
+    font-size: 13px;
+    color: var(--ink-mid);
+    font-weight: 500;
+  }
+
+  /* KPI Strip */
+  .kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 44px;
+  }
+
+  .kpi-card {
+    background: white;
+    border: 1px solid var(--divider);
+    border-radius: 10px;
+    padding: 20px 18px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--gold);
+  }
+
+  .kpi-card.blue::before { background: var(--blue); }
+  .kpi-card.orange::before { background: var(--orange); }
+  .kpi-card.dark::before { background: var(--ink); }
+
+  .kpi-label {
+    font-size: 11px;
+    color: var(--ink-soft);
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+    line-height: 1.4;
+  }
+
+  .kpi-value {
+    font-family: 'Noto Serif TC', serif;
+    font-size: 30px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .kpi-value.gold { color: var(--gold); }
+  .kpi-value.blue { color: var(--blue); }
+  .kpi-value.orange { color: var(--orange); }
+
+  .kpi-sub {
+    font-size: 11px;
+    color: var(--ink-soft);
+  }
+
+  /* Section */
+  .section {
+    margin-bottom: 44px;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .section-num {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--gold);
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  h2 {
+    font-family: 'Noto Serif TC', serif;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: 0.3px;
+  }
+
+  .chart-box {
+    background: white;
+    border: 1px solid var(--divider);
+    border-radius: 12px;
+    padding: 28px;
+  }
+
+  .chart-legend {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--cream-warm);
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    color: var(--ink-mid);
+  }
+
+  .legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .chart-wrap {
+    position: relative;
+    height: 300px;
+  }
+
+  .launch-note {
+    margin-top: 14px;
+    padding: 10px 14px;
+    background: var(--gold-pale);
+    border-left: 3px solid var(--gold);
+    border-radius: 0 6px 6px 0;
+    font-size: 12px;
+    color: var(--ink-mid);
+    line-height: 1.6;
+  }
+
+  /* Two-col layout */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  .sub-chart-box {
+    background: white;
+    border: 1px solid var(--divider);
+    border-radius: 12px;
+    padding: 22px;
+  }
+
+  .sub-chart-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-mid);
+    margin-bottom: 4px;
+  }
+
+  .sub-chart-subtitle {
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin-bottom: 16px;
+  }
+
+  .sub-chart-wrap {
+    position: relative;
+    height: 180px;
+  }
+
+  /* Monthly bar summary */
+  .monthly-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-top: 20px;
+  }
+
+  .month-bar-card {
+    background: white;
+    border: 1px solid var(--divider);
+    border-radius: 10px;
+    padding: 16px;
+  }
+
+  .month-name {
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-bottom: 6px;
+  }
+
+  .month-val {
+    font-family: 'Noto Serif TC', serif;
+    font-size: 26px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .month-bar-bg {
+    height: 4px;
+    background: var(--cream-warm);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .month-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 1s ease;
+  }
+
+  .month-note {
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin-top: 6px;
+  }
+
+  /* Insight box */
+  .insights {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+
+  .insight-card {
+    background: white;
+    border: 1px solid var(--divider);
+    border-radius: 10px;
+    padding: 18px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .insight-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: var(--gold-pale);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .insight-icon.blue-bg { background: #EAF1FB; }
+  .insight-icon.orange-bg { background: #FBF0E8; }
+  .insight-icon.green-bg { background: #E8F5EE; }
+
+  .insight-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+
+  .insight-body {
+    font-size: 12px;
+    color: var(--ink-soft);
+    line-height: 1.7;
+  }
+
+  /* Footer */
+  .footer {
+    margin-top: 52px;
+    padding-top: 20px;
+    border-top: 1px solid var(--divider);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .footer-brand {
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+
+  .footer-brand strong {
+    color: var(--gold);
+    font-weight: 500;
+  }
+
+  .footer-date {
+    font-size: 11px;
+    color: var(--ink-soft);
+    letter-spacing: 1px;
+  }
+
+  @media (max-width: 700px) {
+    .page { padding: 32px 20px 60px; }
+    .kpi-strip { grid-template-columns: repeat(2, 1fr); }
+    .two-col { grid-template-columns: 1fr; }
+    .insights { grid-template-columns: 1fr; }
+    .monthly-grid { grid-template-columns: repeat(3, 1fr); }
+    h1 { font-size: 26px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <div>
+      <div class="brand-tag">氺の尼 泥研製所　Sales Report</div>
+      <h1>星座開運胖胖貓<br><span>銷售分析報告</span></h1>
+    </div>
+    <div class="header-meta">
+      <div class="report-date">報告日期｜2026 年 5 月 26 日</div>
+      <div class="date-range">資料區間｜2026/03/27 – 2026/05/26</div>
+    </div>
+  </div>
+
+  <!-- KPI Strip -->
+  <div class="kpi-strip">
+    <div class="kpi-card">
+      <div class="kpi-label">舊款胖胖金運招福貓<br>總銷量（全期）</div>
+      <div class="kpi-value gold">500<small style="font-size:16px;"> 件</small></div>
+      <div class="kpi-sub">3/27 – 5/26，共 61 天</div>
+    </div>
+    <div class="kpi-card blue">
+      <div class="kpi-label">星座開運胖胖貓<br>總銷量（上市後）</div>
+      <div class="kpi-value blue">273<small style="font-size:16px;"> 件</small></div>
+      <div class="kpi-sub">5/6 上市，僅 21 天</div>
+    </div>
+    <div class="kpi-card orange">
+      <div class="kpi-label">新款單日最高銷量<br>5 月 20 日</div>
+      <div class="kpi-value orange">66<small style="font-size:16px;"> 件</small></div>
+      <div class="kpi-sub">舊款單日最高僅 22 件</div>
+    </div>
+    <div class="kpi-card dark">
+      <div class="kpi-label">新款日均銷量<br>（上市後 21 天）</div>
+      <div class="kpi-value">13<small style="font-size:16px;"> 件</small></div>
+      <div class="kpi-sub">舊款同期日均 7 件</div>
+    </div>
+  </div>
+
+  <!-- Section 1: Main Comparison Chart -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-num">1</div>
+      <h2>每日銷量比較：新舊商品消長關係</h2>
+    </div>
+    <div class="chart-box">
+      <div class="chart-legend">
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#2B5FA6;"></div>
+          胖胖金運招福貓（322073077）
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#C45A1A;"></div>
+          星座開運胖胖貓（322512603 ＋ 322506733 合計）
+        </div>
+        <div class="legend-item" style="margin-left: auto;">
+          <div style="width:16px; height:2px; border-top:2px dashed #C9962A;"></div>
+          新款上市日 5/6
+        </div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="mainChart" role="img" aria-label="新舊商品每日銷量比較折線圖">新款上市後，舊款銷量下滑，新款急速爬升。</canvas>
+      </div>
+      <div class="launch-note">
+        📌 新款於 <strong>5/6 上市</strong>，初期試水期間銷量平穩（1–5 件）；5/19 起急速爆發，5/20 單日達 <strong>66 件</strong>。同期舊款銷量從 10–14 件滑落至 2–7 件，呈現明顯替代效應。
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 2: Monthly Breakdown -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-num">2</div>
+      <h2>月份銷量分佈</h2>
+    </div>
+    <div class="monthly-grid">
+      <div class="month-bar-card">
+        <div class="month-name">3 月（3/27–3/31）</div>
+        <div class="month-val" style="color: var(--gold);">36 <small style="font-size:14px; color: var(--ink-soft);">件</small></div>
+        <div class="month-bar-bg"><div class="month-bar-fill" style="width:46%; background: var(--gold);"></div></div>
+        <div class="month-note">胖胖金運招福貓　日均 7.2 件</div>
+      </div>
+      <div class="month-bar-card">
+        <div class="month-name">4 月（全月）</div>
+        <div class="month-val" style="color: var(--blue);">224 <small style="font-size:14px; color: var(--ink-soft);">件</small></div>
+        <div class="month-bar-bg"><div class="month-bar-fill" style="width:78%; background: var(--blue);"></div></div>
+        <div class="month-note">胖胖金運招福貓　日均 7.5 件</div>
+      </div>
+      <div class="month-bar-card">
+        <div class="month-name">5 月（5/1–5/26）</div>
+        <div class="month-val" style="color: var(--orange);">480 <small style="font-size:14px; color: var(--ink-soft);">件</small></div>
+        <div class="month-bar-bg"><div class="month-bar-fill" style="width:100%; background: var(--orange);"></div></div>
+        <div class="month-note">舊款 240 件 ＋ 新款 240 件（爆發）</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 3: Two Sub Charts -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-num">3</div>
+      <h2>新款上市前後：各自趨勢細看</h2>
+    </div>
+    <div class="two-col">
+      <div class="sub-chart-box">
+        <div class="sub-chart-title" style="color: var(--blue);">胖胖金運招福貓</div>
+        <div class="sub-chart-subtitle">新款上市後（5/6–5/26）銷量變化</div>
+        <div class="sub-chart-wrap">
+          <canvas id="oldSubChart" role="img" aria-label="舊款5月6日後銷量下滑趨勢"></canvas>
+        </div>
+      </div>
+      <div class="sub-chart-box">
+        <div class="sub-chart-title" style="color: var(--orange);">星座開運胖胖貓</div>
+        <div class="sub-chart-subtitle">上市後（5/6–5/26）爆發成長</div>
+        <div class="sub-chart-wrap">
+          <canvas id="newSubChart" role="img" aria-label="新款上市後急速爆發折線圖"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 4: Insights -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-num">4</div>
+      <h2>分析洞察與建議</h2>
+    </div>
+    <div class="insights">
+      <div class="insight-card">
+        <div class="insight-icon">🔄</div>
+        <div>
+          <div class="insight-title">新款取代舊款（替代效應）</div>
+          <div class="insight-body">兩款商品同為「開運胖胖貓」系列，定位相近。新款上市後，消費者明顯轉向，舊款銷量隨即下滑，兩者呈互補消長而非同步成長。</div>
+        </div>
+      </div>
+      <div class="insight-card">
+        <div class="insight-icon blue-bg">🚀</div>
+        <div>
+          <div class="insight-title">新款爆發力超越舊款</div>
+          <div class="insight-body">新款僅用 21 天達到 273 件，日均 13 件；舊款全期 61 天日均 8.2 件。新款尖峰單日 66 件，是舊款最高（22 件）的 3 倍。</div>
+        </div>
+      </div>
+      <div class="insight-card">
+        <div class="insight-icon orange-bg">📅</div>
+        <div>
+          <div class="insight-title">星座換檔節奏帶動銷量</div>
+          <div class="insight-body">5/19 急速爆發，恰好對應雙子座主題登場時機（5/21 雙子座開始）。星座時節切換是本系列的核心流量驅動力，建議持續排程。</div>
+        </div>
+      </div>
+      <div class="insight-card">
+        <div class="insight-icon green-bg">💡</div>
+        <div>
+          <div class="insight-title">建議：差異化或汰換舊款</div>
+          <div class="insight-body">若新款持續熱銷，可評估舊款促銷出清或調整定位（如組合禮盒、不分星座款）；並確保下一星座換檔前提前備貨，把握爆發期。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="footer-brand">氺の尼 泥研製所　｜　<strong>星座開運胖胖貓</strong> 銷售數據分析</div>
+    <div class="footer-date">2026.05.26</div>
+  </div>
+
+</div>
+
+<script>
+const allDates = ["03-27","03-28","03-29","03-30","03-31","04-01","04-02","04-03","04-04","04-05","04-06","04-07","04-08","04-09","04-10","04-11","04-12","04-13","04-14","04-15","04-16","04-17","04-18","04-19","04-20","04-21","04-22","04-23","04-24","04-25","04-26","04-27","04-28","04-29","04-30","05-01","05-02","05-03","05-04","05-05","05-06","05-07","05-08","05-09","05-10","05-11","05-12","05-13","05-14","05-15","05-16","05-17","05-18","05-19","05-20","05-21","05-22","05-23","05-24","05-25","05-26"];
+
+const oldData = [7,7,7,9,6,5,5,6,5,2,5,10,8,8,9,9,4,3,19,7,10,8,5,3,3,6,12,7,22,7,9,5,11,5,6,6,5,6,11,7,15,22,12,18,9,6,12,12,5,11,11,10,10,12,14,4,4,6,3,7,2];
+const newMap = {"05-06":1,"05-07":4,"05-08":5,"05-09":4,"05-10":2,"05-11":4,"05-12":3,"05-13":4,"05-14":3,"05-15":3,"05-17":6,"05-18":11,"05-19":33,"05-20":66,"05-21":30,"05-22":29,"05-23":25,"05-24":21,"05-25":27,"05-26":20};
+const newData = allDates.map(d => newMap[d] !== undefined ? newMap[d] : null);
+const launchIdx = allDates.indexOf("05-06");
+
+// Main chart
+new Chart(document.getElementById('mainChart'), {
+  type: 'line',
+  data: {
+    labels: allDates,
+    datasets: [
+      {
+        label: '胖胖金運招福貓',
+        data: oldData,
+        borderColor: '#2B5FA6',
+        backgroundColor: 'rgba(43,95,166,0.06)',
+        borderWidth: 2,
+        pointRadius: 2,
+        pointHoverRadius: 5,
+        fill: true,
+        tension: 0.35,
+        order: 2
+      },
+      {
+        label: '星座開運胖胖貓',
+        data: newData,
+        borderColor: '#C45A1A',
+        backgroundColor: 'rgba(196,90,26,0.06)',
+        borderWidth: 2,
+        pointRadius: 2,
+        pointHoverRadius: 5,
+        fill: true,
+        tension: 0.35,
+        spanGaps: false,
+        order: 1
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: 'rgba(26,20,16,0.88)',
+        titleColor: '#FAF6EE',
+        bodyColor: '#D4C4A8',
+        padding: 10,
+        callbacks: {
+          title: items => '日期：2026/' + items[0].label,
+          label: item => item.parsed.y !== null ? item.dataset.label + '：' + item.parsed.y + ' 件' : null
+        },
+        filter: item => item.parsed.y !== null
+      },
+      annotation: {
+        annotations: {
+          launch: {
+            type: 'line',
+            xMin: launchIdx, xMax: launchIdx,
+            borderColor: 'rgba(201,150,42,0.55)',
+            borderWidth: 1.5,
+            borderDash: [5,4],
+            label: {
+              display: true,
+              content: '新款上市 5/6',
+              position: 'start',
+              font: { size: 10 },
+              color: '#C9962A',
+              yAdjust: -6
+            }
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        ticks: { autoSkip: true, maxTicksLimit: 14, maxRotation: 45, font: { size: 10 }, color: '#7A6A55' },
+        grid: { color: 'rgba(0,0,0,0.04)' }
+      },
+      y: {
+        beginAtZero: true,
+        ticks: { font: { size: 10 }, color: '#7A6A55', callback: v => v + ' 件' },
+        grid: { color: 'rgba(0,0,0,0.05)' }
+      }
+    }
+  }
+});
+
+// Sub chart - old product after launch
+const subDates = allDates.slice(launchIdx);
+const oldSubData = oldData.slice(launchIdx);
+new Chart(document.getElementById('oldSubChart'), {
+  type: 'line',
+  data: {
+    labels: subDates,
+    datasets: [{
+      data: oldSubData,
+      borderColor: '#2B5FA6',
+      backgroundColor: 'rgba(43,95,166,0.07)',
+      borderWidth: 2,
+      pointRadius: 2,
+      fill: true,
+      tension: 0.35
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: i => i.parsed.y + ' 件' } } },
+    scales: {
+      x: { ticks: { font: { size: 10 }, color: '#7A6A55', maxTicksLimit: 8, maxRotation: 45 }, grid: { display: false } },
+      y: { beginAtZero: true, ticks: { font: { size: 10 }, color: '#7A6A55', callback: v => v + ' 件' }, grid: { color: 'rgba(0,0,0,0.05)' } }
+    }
+  }
+});
+
+// Sub chart - new product
+const newSubData = subDates.map(d => newMap[d] !== undefined ? newMap[d] : 0);
+new Chart(document.getElementById('newSubChart'), {
+  type: 'line',
+  data: {
+    labels: subDates,
+    datasets: [{
+      data: newSubData,
+      borderColor: '#C45A1A',
+      backgroundColor: 'rgba(196,90,26,0.07)',
+      borderWidth: 2,
+      pointRadius: 2,
+      fill: true,
+      tension: 0.35
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: i => i.parsed.y + ' 件' } } },
+    scales: {
+      x: { ticks: { font: { size: 10 }, color: '#7A6A55', maxTicksLimit: 8, maxRotation: 45 }, grid: { display: false } },
+      y: { beginAtZero: true, ticks: { font: { size: 10 }, color: '#7A6A55', callback: v => v + ' 件' }, grid: { color: 'rgba(0,0,0,0.05)' } }
+    }
+  }
+});
+</script>
+</body>
+</html>
