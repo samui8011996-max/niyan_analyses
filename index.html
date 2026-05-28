@@ -3172,20 +3172,48 @@ const numButtons = `
       </div>
     `;
   }).join('') + `
-  <div class="pf-form-card" style="border-left-color: var(--tape-purple); border-style: dashed;">
+<div class="pf-form-card" style="border-left-color: var(--tape-purple); border-style: dashed;">
     <div class="pf-form-head">
       <span class="pf-name" style="color:var(--ink-soft);font-size:14px;">＋ 新增平台</span>
     </div>
-    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
-      <div class="field" style="min-width:120px;flex:1;">
+    <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:12px;">
+      <div class="field" style="flex:1;">
         <label>平 台 名 稱</label>
         <input type="text" id="inline_pm_name" placeholder="例：露天、MOMO…">
       </div>
-      <div class="field" style="min-width:160px;flex:2;">
-        <label>物 流（逗號分隔，留空=總件數）</label>
-        <input type="text" id="inline_pm_logi" placeholder="黑貓,超商">
-      </div>
       <button type="button" class="btn primary" id="inline_pm_add" style="padding:8px 18px;white-space:nowrap;">新 增</button>
+    </div>
+    <div id="inline_pm_inputs" style="display:none;">
+      <div class="pf-inputs">
+        <div class="field">
+          <label>黑 貓</label>
+          <input type="number" min="0" class="inline-logi-input" data-logi="黑貓" placeholder="0">
+          <div class="pf-num-btns">
+            <button type="button" class="pf-num-btn" data-inline-delta="1">+1</button>
+            <button type="button" class="pf-num-btn" data-inline-delta="5">+5</button>
+            <button type="button" class="pf-num-btn" data-inline-delta="10">+10</button>
+            <button type="button" class="pf-num-btn" data-inline-delta="50">+50</button>
+            <button type="button" class="pf-num-btn clear" data-inline-clear="黑貓">清除</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>超 商</label>
+          <input type="number" min="0" class="inline-logi-input" data-logi="超商" placeholder="0">
+          <div class="pf-num-btns">
+            <button type="button" class="pf-num-btn" data-inline-delta="1">+1</button>
+            <button type="button" class="pf-num-btn" data-inline-delta="5">+5</button>
+            <button type="button" class="pf-num-btn" data-inline-delta="10">+10</button>
+            <button type="button" class="pf-num-btn" data-inline-delta="50">+50</button>
+            <button type="button" class="pf-num-btn clear" data-inline-clear="超商">清除</button>
+          </div>
+        </div>
+      </div>
+      <div class="pf-form-note" style="margin-top:8px;">
+        <input type="text" id="inline_pm_note" placeholder="備註">
+      </div>
+      <div style="text-align:right;margin-top:10px;">
+        <button type="button" class="btn primary" id="inline_pm_submit">送 出</button>
+      </div>
     </div>
   </div>
   </div>`;
@@ -3215,21 +3243,71 @@ area.querySelectorAll('.pf-num-btn').forEach(btn => {
 });
 
   getPlatformOrder().forEach(updatePfSum);
-}
-const inlineAddBtn = document.getElementById('inline_pm_add');
+  // inline 新增平台
+  const inlineAddBtn = document.getElementById('inline_pm_add');
   if (inlineAddBtn) {
     inlineAddBtn.addEventListener('click', () => {
       const name = document.getElementById('inline_pm_name').value.trim();
       if (!name) { toast('請輸入平台名稱', true); return; }
       if (getPlatformOrder().includes(name)) { toast('此平台已存在', true); return; }
-      const logiRaw = document.getElementById('inline_pm_logi').value.trim();
-      const logi = logiRaw ? logiRaw.split(/[,，]/).map(s => s.trim()).filter(Boolean) : [];
-      CUSTOM_PLATFORMS[name] = logi;
+      document.getElementById('inline_pm_inputs').style.display = 'block';
+      inlineAddBtn.style.display = 'none';
+    });
+  }
+
+  const inlineSubmitBtn = document.getElementById('inline_pm_submit');
+  if (inlineSubmitBtn) {
+    inlineSubmitBtn.addEventListener('click', async () => {
+      const name = document.getElementById('inline_pm_name').value.trim();
+      if (!name) { toast('請輸入平台名稱', true); return; }
+      if (getPlatformOrder().includes(name)) { toast('此平台已存在', true); return; }
+
+      CUSTOM_PLATFORMS[name] = ['黑貓', '超商'];
       localStorage.setItem('customPlatforms_v1', JSON.stringify(CUSTOM_PLATFORMS));
-      toast(`已新增平台「${name}」`);
+
+      const date = $('#p_date').value || todayStr();
+      let detail = [], total = 0;
+      document.querySelectorAll('.inline-logi-input').forEach(inp => {
+        const n = Number(inp.value) || 0;
+        if (n > 0) detail.push({ 物流: inp.dataset.logi, 件數: n });
+        total += n;
+      });
+      const note = document.getElementById('inline_pm_note').value.trim();
+
+      if (total > 0 || note) {
+        try {
+          await api('addPlatform', { '日期': date, '平台': name, '明細': detail, '總件數': total, '備註': note });
+          toast(`已新增平台「${name}」並送出`);
+        } catch(e) { toast(e.message, true); return; }
+      } else {
+        toast(`已新增平台「${name}」`);
+      }
+
+      await loadAll();
       renderPlatformForm();
     });
   }
+
+  // inline 加減按鈕
+  document.querySelectorAll('[data-inline-delta]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const field = btn.closest('.field');
+      if (!field) return;
+      const inp = field.querySelector('.inline-logi-input');
+      if (!inp) return;
+      inp.value = Math.max(0, (Number(inp.value) || 0) + Number(btn.dataset.inlineDelta)) || '';
+    });
+  });
+  document.querySelectorAll('[data-inline-clear]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const field = btn.closest('.field');
+      if (!field) return;
+      const inp = field.querySelector('.inline-logi-input');
+      if (inp) inp.value = '';
+    });
+  });
+}
+
 function updatePfSum(name) {
   let sum = 0;
   document.querySelectorAll(`.pf-input[data-pf="${cssEscape(name)}"]`).forEach(inp => {
