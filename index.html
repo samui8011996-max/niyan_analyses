@@ -1313,16 +1313,20 @@ z-index: 10;
 <!-- 新平台單 -->
 <section class="section" id="sec-platform">
   <div class="card">
-    <span class="tape t-blue">platform ✦ 新 平 台 單</span>
+   <span class="tape t-blue">platform ✦ 新 平 台 單</span>
     <div class="form-grid" style="margin-bottom:16px;">
       <div class="field">
         <label>日 期</label>
         <input type="date" id="p_date">
       </div>
-      <div class="field full">
+<div class="field full">
         <label>全域備註（選填）</label>
         <input type="text" id="p_global_note" placeholder="適用所有平台的備註…">
       </div>
+      <div class="field" style="margin-top:4px;">
+        <button class="btn small ghost" id="openPlatformMgmt" style="font-size:12px;">＋ 管 理 平 台</button>
+      </div>
+    </div>
     </div>
     <div id="p_all_platforms"></div>
     <div class="btn-row">
@@ -1499,7 +1503,31 @@ z-index: 10;
     </div>
   </div>
 </div>
-
+<!-- ===== Modal: 管理平台 ===== -->
+<div class="modal-bg" id="platformMgmtModal">
+  <div class="modal" style="max-width: 480px;">
+    <button class="modal-close" data-close>×</button>
+    <h2>管 理 平 台</h2>
+    <div id="pmExistingList" style="max-height:260px;overflow-y:auto;margin-bottom:12px;padding-right:4px;"></div>
+    <div style="border-top:1px dashed var(--line);padding-top:12px;">
+      <div style="font-size:12px;color:var(--ink-soft);letter-spacing:1px;margin-bottom:10px;">新增平台</div>
+      <div class="form-grid">
+        <div class="field full">
+          <label>平 台 名 稱</label>
+          <input type="text" id="pmName" placeholder="例：露天、MOMO…">
+        </div>
+        <div class="field full">
+          <label>物 流 選 項（逗號分隔，留空則只填總件數）</label>
+          <input type="text" id="pmLogistics" placeholder="黑貓,超商">
+        </div>
+      </div>
+    </div>
+    <div class="btn-row" style="border:none;padding-top:12px;">
+      <button class="btn ghost" data-close>關 閉</button>
+      <button class="btn primary" id="pmSave">新 增</button>
+    </div>
+  </div>
+</div>
 <!-- ===== Modal: 編輯平台單 ===== -->
 <div class="modal-bg" id="pfModal">
   <div class="modal">
@@ -1535,7 +1563,7 @@ const DEFAULT_COLOR_MAP = {
   '灰': '#a8a195'
 };
 
-const PLATFORM_LOGISTICS = {
+const DEFAULT_PLATFORM_LOGISTICS = {
   'Line禮物': ['黑貓'],
   '蝦皮':     ['超商','蝦皮隔日','蝦皮一般','蝦皮黑貓'],
   'Pinkoi':   ['黑貓','超商'],
@@ -1545,7 +1573,25 @@ const PLATFORM_LOGISTICS = {
   '酷澎':     []
 };
 
-const PLATFORM_ORDER = ['Line禮物','蝦皮','Pinkoi','瑪黑','官網','博客來','酷澎'];
+const DEFAULT_PLATFORM_ORDER = ['Line禮物','蝦皮','Pinkoi','瑪黑','官網','博客來','酷澎'];
+
+
+
+// 動態（從 localStorage 讀取自訂平台）
+let CUSTOM_PLATFORMS = {};
+try {
+  CUSTOM_PLATFORMS = JSON.parse(localStorage.getItem('customPlatforms_v1') || '{}');
+} catch(_) {}
+
+function getPlatformLogistics() {
+  return Object.assign({}, DEFAULT_PLATFORM_LOGISTICS, CUSTOM_PLATFORMS);
+}
+function getPlatformOrder() {
+  const custom = Object.keys(CUSTOM_PLATFORMS);
+  return [...DEFAULT_PLATFORM_ORDER, ...custom.filter(k => !DEFAULT_PLATFORM_ORDER.includes(k))];
+}
+
+
 
 /* ============ 工具函式 ============ */
 function mergeList(defaults, custom) {
@@ -1645,7 +1691,17 @@ function progressOf(orderId) {
   return state.progress.filter(p => p['訂單id'] === orderId);
 }
 function doneOf(orderId) {
-  return progressOf(orderId).reduce((s, p) => s + (Number(p['完成數量']) || 0), 0);
+  return state.progress.filter(p => p['訂單id'] === orderId)
+    .reduce((s, p) => s + (Number(p['完成數量']) || 0), 0);
+}
+
+function isOrderDone(o) {
+  const itList = Array.isArray(o['items']) && o['items'].length ? o['items'] : null;
+  if (itList) {
+    return itList.every(it => isDone(it['已完成']));
+  }
+  const qty = Number(o['數量']) || 0;
+  return isDone(o['已完成']) || (qty > 0 && doneOf(o.id) >= qty);
 }
 
 function renderAll() {
@@ -1669,7 +1725,7 @@ function renderPlatformBoard() {
 
   // 計算未完成且無備註者（可以一鍵完成的）
   let undoneCanBulk = 0;
-  PLATFORM_ORDER.forEach(name => {
+  getPlatformOrder().forEach(name => {
     const rec = byPlatform[name];
     if (rec && !isDone(rec['已完成'])) {
       const note = safeText(rec['備註']);
@@ -1684,11 +1740,11 @@ function renderPlatformBoard() {
     bulkBar.style.display = 'none';
   }
 
-  const visibleNames = PLATFORM_ORDER.filter(n => {
+  const visibleNames = getPlatformOrder().filter(n => {
     if (!hiddenPf.has(n + '|' + today)) return true;
     return false;
   });
-  const hiddenCount = PLATFORM_ORDER.length - visibleNames.length;
+  const hiddenCount = getPlatformOrder().length - visibleNames.length;
 
   if (visibleNames.length === 0) {
     list.innerHTML = '<div class="empty" style="grid-column:1/-1;">所有平台已隱藏</div>';
@@ -1742,7 +1798,7 @@ ${isDone(rec['已完成'])
   if (hiddenCount > 0) {
     toggle.innerHTML = `<button id="pfShowHidden">顯示已隱藏的 ${hiddenCount} 個</button>`;
     $('#pfShowHidden').addEventListener('click', () => {
-      PLATFORM_ORDER.forEach(n => hiddenPf.delete(n + '|' + today));
+      getPlatformOrder().forEach(n => hiddenPf.delete(n + '|' + today));
       saveHidden();
       renderPlatformBoard();
     });
@@ -1859,8 +1915,8 @@ if (vendorFilter === 'open') {
     list.innerHTML = orders.map(o => {
       const qty  = Number(o['數量']) || 0;
       const done = doneOf(o.id);
-      const isDone   = qty > 0 && done >= qty;
-      const isUrgent = o['交期'] && o['交期'] === todayStr();
+      const isDone   = isOrderDone(o);
+      const isUrgent = o['交期'] && o['交期'] === todayStr() && !isDone;
       const pct  = qty > 0 ? Math.min(100, done/qty*100) : 0;
 
       const colors = String(o['顏色']||'').split(/[、,，]/).map(c => c.trim()).filter(Boolean);
@@ -1884,40 +1940,34 @@ const pack    = safeText(o['附加']);
             ${o['交期'] ? `<span class="due">／ 交期 ${fmtDate(o['交期'])}</span>` : ''}
           </div>
           ${safeText(o['廠商']) ? `<div class="vc-vendor">${escapeHtml(safeText(o['廠商']))}</div>` : ''}
-          <div class="vc-item">${escapeHtml(safeText(o['品項'])||'（未指定）')}</div>
+          ${!Array.isArray(o['items']) || !o['items'].length ? `<div class="vc-item">${escapeHtml(safeText(o['品項'])||'（未指定）')}</div>` : ''}
     ${(() => {
-            const itList = Array.isArray(o['items']) && o['items'].length ? o['items'] : null;
-            if (itList) {
-              return itList.map(it => {
-                const itColors = String(it['顏色']||'').split(/[、,，]/).map(c=>c.trim()).filter(Boolean);
-                const itColorHtml = itColors.map(c=>`<span class="color-tag"><span class="swatch" style="background:${colorOf(c)}"></span>${escapeHtml(c)}</span>`).join('');
-                const itSpecs = [safeText(it['款式']), itColorHtml, safeText(it['大小'])].filter(Boolean).join(' ');
-                const itQty = Number(it['數量'])||0;
-                
-                // 📝 新增：透過比對紀錄的備註，計算此細項的「已完成數量」
-                const itMatchStr = `${safeText(it['品項'])} ${safeText(it['款式'])} ${safeText(it['大小'])}`.trim();
-                const itDone = progressOf(o.id)
-                  .filter(p => safeText(p['備註']) === itMatchStr)
-                  .reduce((s, p) => s + (Number(p['完成數量']) || 0), 0);
+  const itList = Array.isArray(o['items']) && o['items'].length ? o['items'] : null;
+  if (!itList) return '';
+  return itList.map(it => {
+    const itColors = String(it['顏色']||'').split(/[、,，]/).map(c=>c.trim()).filter(Boolean);
+    const itColorHtml = itColors.map(c=>`<span class="color-tag"><span class="swatch" style="background:${colorOf(c)}"></span>${escapeHtml(c)}</span>`).join('');
+    const itSpecs = [safeText(it['款式']), itColorHtml, safeText(it['大小'])].filter(Boolean).join(' ');
+    const itQty = Number(it['數量'])||0;
+    const itMatchStr = `${safeText(it['品項'])} ${safeText(it['款式'])} ${safeText(it['大小'])}`.trim();
+    const itDone = progressOf(o.id)
+      .filter(p => safeText(p['備註']) === itMatchStr)
+      .reduce((s, p) => s + (Number(p['完成數量']) || 0), 0);
+const itPack = safeText(it['附加']);
+return `<div style="padding:4px 0;border-bottom:1px dotted var(--line);font-size:13px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <span><b>${escapeHtml(safeText(it['品項'])||'—')}</b>${itSpecs?` <span style="color:var(--ink-soft);font-size:12px;">${itSpecs}</span>`:''}</span>
+        <span style="font-family:'Shippori Mincho',serif;font-weight:700;margin-left:8px;">
+          <span style="color:var(--stamp-blue);">${itDone}</span>
+          <span style="color:var(--line-dark);margin:0 4px;">/</span>
+          <span>${itQty||'—'}</span>
+        </span>
+      </div>
+      ${itPack ? `<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">📦 ${escapeHtml(itPack)}</div>` : ''}
+    </div>`;
+  }).join('');
+})()}
 
-                // 📝 更新：將數量顯示改為「已完成 / 總數」的樣式
-                return `<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px dotted var(--line);font-size:13px;">
-                  <span><b>${escapeHtml(safeText(it['品項'])||'—')}</b>${itSpecs?` <span style="color:var(--ink-soft);font-size:12px;">${itSpecs}</span>`:''}${it['附加']?` <span style="color:var(--ink-soft);font-size:11px;">📦${escapeHtml(it['附加'])}</span>`:''}</span>
-                  <span style="font-family:'Shippori Mincho',serif;font-weight:700;margin-left:8px;">
-                    <span style="color:var(--stamp-blue);">${itDone}</span>
-                    <span style="color:var(--line-dark);margin:0 4px;">/</span>
-                    <span>${itQty||'—'}</span>
-                  </span>
-                </div>`;
-              }).join('');
-            } else {
-              return `
-                ${specs.length ? `<div class="vc-spec">${specs.join('')}</div>` : ''}
-                ${qty > 0 ? `<div class="vc-qty"><span class="done-num">${done}</span><span class="slash">／</span><span>${qty}</span></div><div class="vc-progress-bar ${isDone?'complete':''}"><div style="width:${pct}%"></div></div>` : ''}
-              `;
-            }
-          })()}
-          ${pack    ? `<div class="vc-pack">📦 ${escapeHtml(pack)}</div>` : ''}
           ${orderNo ? `<div class="vc-note" style="color:var(--stamp-blue);font-size:12px;">🔖 ${escapeHtml(orderNo)}</div>` : ''}
           ${note    ? `<div class="vc-note">${escapeHtml(note)}</div>` : ''}
         </div>
@@ -1966,13 +2016,11 @@ function renderHistoryVendor() {
   let orders = state.orders.slice();
 if (status === 'open') orders = orders.filter(o => {
   if (hiddenVendor.has(o.id)) return false;
-  const qty = Number(o['數量']) || 0;
-  return !isDone(o['已完成']) && (qty === 0 || doneOf(o.id) < qty);
+  return !isOrderDone(o);
 });
 if (status === 'done') orders = orders.filter(o => {
   if (hiddenVendor.has(o.id)) return false;
-  const qty = Number(o['數量']) || 0;
-  return isDone(o['已完成']) || (qty > 0 && doneOf(o.id) >= qty);
+  return isOrderDone(o);
 });
   if (status === 'hidden') orders = orders.filter(o => hiddenVendor.has(o.id));
   if (dateF)    orders = orders.filter(o => fmtDate(o['下單日期']) === dateF);
@@ -2024,7 +2072,7 @@ if (!vContainer) {
   orders.forEach(o => {
     const qty  = Number(o['數量']) || 0;
     const done = doneOf(o.id);
-    const isDone   = qty > 0 && done >= qty;
+    const isDone = isOrderDone(o);
     const isHidden = hiddenVendor.has(o.id);
     const isUrgent = o['交期'] && o['交期'] === todayStr() && !isDone;
     const checked  = (window._vSelected || []).includes(o.id) ? 'checked' : '';
@@ -2699,41 +2747,40 @@ let html = `
       const itColorHtml = itColors.map(c=>`<span style="display:inline-flex;align-items:center;gap:3px;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${colorOf(c)};border:1px solid rgba(0,0,0,.15);"></span>${escapeHtml(c)}</span>`).join(' ');
       const itQty = Number(it['數量'])||0;
       const itPack = it['附加'] ? `📦${escapeHtml(it['附加'])}` : '';
-      return `<div style="background:var(--paper-2);border-radius:6px;padding:8px 10px;margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-        <span style="flex:1;font-size:13px;"><b>${escapeHtml(safeText(it['品項'])||'—')}</b> ${escapeHtml(safeText(it['款式']))} ${itColorHtml} ${escapeHtml(safeText(it['大小']))} ${itPack}</span>
-        <span style="font-family:'Shippori Mincho',serif;font-weight:700;font-size:15px;white-space:nowrap;">× ${itQty}</span>
-        <input type="number" class="it-qty" min="0" max="${itQty}" placeholder="完成數" data-item-idx="${idx}"
-  style="width:80px;text-align:center;font-size:15px;font-weight:700;padding:4px 8px;border-radius:6px;border:1.5px solid var(--accent);background:#fff;">
-      </div>`;
+return `<div style="background:var(--paper-2);border-radius:6px;padding:8px 10px;margin-bottom:6px;">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+    <span style="flex:1;font-size:13px;"><b>${escapeHtml(safeText(it['品項'])||'—')}</b> ${escapeHtml(safeText(it['款式']))} ${itColorHtml} ${escapeHtml(safeText(it['大小']))}${itPack?`<br><span style="font-size:11px;color:var(--ink-soft);">📦 ${escapeHtml(itPack)}</span>`:''}</span>
+    <span style="font-family:'Shippori Mincho',serif;font-weight:700;font-size:15px;white-space:nowrap;">× ${itQty}</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+    <input type="number" class="it-qty" min="0" max="${itQty}" placeholder="0" data-item-idx="${idx}"
+      style="width:70px;text-align:center;font-size:16px;font-weight:700;padding:4px 8px;border-radius:6px;border:1.5px solid var(--accent);background:#fff;">
+    <button type="button" class="pf-num-btn" data-it-idx="${idx}" data-it-add="1">+1</button>
+    <button type="button" class="pf-num-btn" data-it-idx="${idx}" data-it-add="5">+5</button>
+    <button type="button" class="pf-num-btn" data-it-idx="${idx}" data-it-add="10">+10</button>
+    <button type="button" class="pf-num-btn" data-it-idx="${idx}" data-it-add="50">+50</button>
+    <button type="button" class="pf-num-btn clear" data-it-idx="${idx}" data-it-clear="1">清除</button>
+  </div>
+</div>`;
     }).join('') + `</div>`;
   }
 
-  if (qty > 0) {
+  if (qty > 0 || itList) {
     html += `
       <div style="margin: 10px 0 14px;">
-        <div style="font-size:13px;color:var(--ink-soft);margin-bottom:8px;letter-spacing:1px;">包貨人員填寫</div>
+       
         <div class="qty-check-row" id="qChk" style="${isDone?'opacity:.5;pointer-events:none;':''}">
           <input type="checkbox" id="checkAll">
          <label for="checkAll">一鍵完成${itList ? '所有品項' : `剩餘 <b style="font-size:16px;">${remaining}</b> 個`}</label>
         </div>
         <div style="${isDone?'opacity:.5;pointer-events:none;':''}">
+<div style="font-size:13px;color:var(--ink-soft);margin-bottom:8px;letter-spacing:1px;">包貨人員填寫</div>
 <div class="form-grid" style="margin-bottom: 10px;">
-            ${!itList ? `<div class="field">
-              <label>包貨人員</label>
-              <select id="pStaff">${staffOpts}</select>
-            </div>` : ''}
-           
-           <div class="field">
-  <label>完成數量</label>
-  <input type="number" id="pQty" min="1" max="${remaining}" placeholder="輸入或勾選…">
-  <div class="pf-num-btns">
-    <button type="button" class="pf-num-btn" 
-    <button type="button" class="pf-num-btn" data-pqty="5">+5</button>
-    <button type="button" class="pf-num-btn" data-pqty="10">+10</button>
-    <button type="button" class="pf-num-btn" data-pqty="50">+50</button>
-    <button type="button" class="pf-num-btn clear" data-pqty-clear="1">清除</button>
-  </div>
+<div class="field">
+  <label>包貨人員</label>
+  <select id="pStaff">${staffOpts}</select>
 </div>
+           
             <div class="field">      
               <label>總箱數</label>
               <input type="number" id="pBoxes" min="0" placeholder="—">
@@ -2796,6 +2843,18 @@ let html = `
     </div>
   `;
   $('#omBody').innerHTML = html;
+  $('#omBody').querySelectorAll('[data-it-add]').forEach(b => {
+  b.addEventListener('click', () => {
+    const inp = $('#omBody').querySelector(`.it-qty[data-item-idx="${b.dataset.itIdx}"]`);
+    if (inp) inp.value = (Number(inp.value)||0) + Number(b.dataset.itAdd);
+  });
+});
+$('#omBody').querySelectorAll('[data-it-clear]').forEach(b => {
+  b.addEventListener('click', () => {
+    const inp = $('#omBody').querySelector(`.it-qty[data-item-idx="${b.dataset.itIdx}"]`);
+    if (inp) inp.value = '';
+  });
+});
 
   // 多品項加減按鈕
   $('#omBody').querySelectorAll('.it-add').forEach(b => {
@@ -2813,33 +2872,16 @@ let html = `
 
 const chk = $('#checkAll'), pQty = $('#pQty');
   if (chk) {
-    chk.addEventListener('change', () => {
-      
-      if (itList) {
-        // 若為多品項訂單：將所有獨立品項的完成數填入最大值
-        $('#omBody').querySelectorAll('.it-qty').forEach(inp => {
-          inp.value = chk.checked ? inp.getAttribute('max') : '';
-        });
-      } else if (pQty) {
-        // 若為單一品項訂單：填入總剩餘數量
-        pQty.value = chk.checked ? remaining : '';
-        pQty.dispatchEvent(new Event('input'));
-      }
-
-      if (chk.checked) {
-        // 勾選後自動送出
-        const saveBtn = $('#pSave');
-        const allBtns = $('#omBody').querySelectorAll('button, input, select');
-        if (saveBtn) {
-          saveBtn.disabled = true;
-          saveBtn.textContent = '上傳中…';
-          saveBtn.style.opacity = '0.5';
-          saveBtn.style.cursor = 'not-allowed';
-        }
-        allBtns.forEach(el => { el.disabled = true; });
-        addOrderProgress();
-      }
+   chk.addEventListener('change', () => {
+  if (itList) {
+    $('#omBody').querySelectorAll('.it-qty').forEach(inp => {
+      inp.value = chk.checked ? inp.getAttribute('max') : '';
     });
+  } else if (pQty) {
+    pQty.value = chk.checked ? remaining : '';
+    pQty.dispatchEvent(new Event('input'));
+  }
+});
     
     // 同步單一品項的輸入框狀態
     if (pQty) {
@@ -2901,18 +2943,19 @@ async function addOrderProgress() {
   const itListCur = Array.isArray(o['items']) && o['items'].length ? o['items'] : null;
 
   if (itListCur) {
-    // 多品項：逐筆收集
     const entries = [];
     $('#omBody').querySelectorAll('.it-qty').forEach(inp => {
       const n = Number(inp.value) || 0;
       if (n > 0) {
         const idx = inp.dataset.itemIdx;
-        const staff = $('#omBody').querySelector(`.it-staff[data-item-idx="${idx}"]`)?.value || '';
         const it = itListCur[idx] || {};
-        entries.push({ n, staff, it });
+        entries.push({ n, it });
       }
     });
     if (!entries.length) { toast('請至少填一項數量', true); return; }
+
+    const staff = $('#pStaff')?.value || '';
+    if (!staff) { toast('請選包貨人員', true); return; }
 
     const saveBtn = $('#pSave');
     const allBtns = $('#omBody').querySelectorAll('button, input, select');
@@ -2930,14 +2973,14 @@ async function addOrderProgress() {
           '完成數量': e.n,
           '總箱數':   boxes,
           '物流公司': logi,
-          '包貨人員': e.staff,
+          '包貨人員': staff,
           '備註': `${safeText(e.it['品項'])} ${safeText(e.it['款式'])} ${safeText(e.it['大小'])}`.trim()
         });
       }
       await loadAll();
       const updated = state.orders.find(x => x.id === o.id);
       if (updated) { currentOrder = updated; renderOrderModal(); }
-      toast('已記入 +' + entries.reduce((s,e) => s+e.n, 0));
+      toast('已記入 +' + entries.reduce((s, e) => s + e.n, 0));
     } catch (e) {
       toast(e.message, true);
       $('#omBody').querySelectorAll('button, input, select').forEach(el => { el.disabled = false; });
@@ -2947,8 +2990,8 @@ async function addOrderProgress() {
     return;
   }
 
-  // 單品項原本邏輯
-  const qty   = Number($('#pQty').value);
+  // 單品項
+  const qty   = Number($('#pQty')?.value);
   const staff = $('#pStaff').value;
   if (!qty || qty <= 0) { toast('請輸入數量', true); return; }
   if (!staff)            { toast('請選包貨人員', true); return; }
@@ -2989,47 +3032,35 @@ function openOrderEdit(o) {
   $('#omTitle').textContent = '編 輯 訂 單';
   $('#omBody').innerHTML = `
     <div class="form-grid">
-      <div class="field"><label>下單日</label><input type="date" id="e_date" value="${fmtDate(o['下單日期'])}"></div>
-      <div class="field"><label>交期</label><input type="date" id="e_due" value="${fmtDate(o['交期'])}"></div>
-      <div class="field"><label>廠商</label><select id="e_vendor">${opts(mergeList(DEFAULT_VENDORS, s['廠商']), safeText(o['廠商']))}</select></div>
-      <div class="field"><label>品項</label><select id="e_item">${opts(mergeList(DEFAULT_ITEMS,   s['品項']), safeText(o['品項']))}</select></div>
-      <div class="field"><label>款式</label><select id="e_style">${opts(mergeList(DEFAULT_STYLES,  s['款式']), safeText(o['款式']))}</select></div>
-      <div class="field"><label>大小</label><select id="e_size">${opts(mergeList(DEFAULT_SIZES,   s['大小']), safeText(o['大小']))}</select></div>
-      <div class="field full"><label>顏色</label>
-        <div class="color-grid" id="e_colors"></div>
+      <div class="field">
+        <label>下單日</label>
+        <input type="date" id="e_date" value="${fmtDate(o['下單日期'])}">
       </div>
-      <div class="field"><label>數量</label><input type="number" id="e_qty" value="${o['數量']||''}"></div>
-      <div class="field full"><label>附加</label><input type="text" id="e_pack" value="${escapeAttr(safeText(o['附加']))}"></div>
-      <div class="field full"><label>訂單編號</label><input type="text" id="e_order_no" value="${escapeAttr(safeText(o['訂單編號']))}"></div>
-      <div class="field full"><label>備註</label><textarea id="e_note">${escapeHtml(safeText(o['備註']))}</textarea></div>
+      <div class="field">
+        <label>交期</label>
+        <input type="date" id="e_due" value="${fmtDate(o['交期'])}">
+      </div>
+      <div class="field">
+        <label>廠商</label>
+        <select id="e_vendor">${opts(mergeList(DEFAULT_VENDORS, s['廠商']), safeText(o['廠商']))}</select>
+      </div>
+      <div class="field full">
+        <label>訂單編號</label>
+        <input type="text" id="e_order_no" value="${escapeAttr(safeText(o['訂單編號']))}">
+      </div>
+      <div class="field full">
+        <label>備註</label>
+        <textarea id="e_note">${escapeHtml(safeText(o['備註']))}</textarea>
+      </div>
     </div>
     <div class="btn-row split">
-      <button class="btn small danger"  id="eDel">刪除</button>
+      <button class="btn small danger" id="eDel">刪除</button>
       <div style="display:flex;gap:10px;">
-        <button class="btn small ghost"   id="eBack">返回</button>
+        <button class="btn small ghost" id="eBack">返回</button>
         <button class="btn small primary" id="eSave">儲 存</button>
       </div>
     </div>
   `;
-
-  let eSelected = colors.slice();
-  const eGrid   = $('#e_colors');
-  const colorOpts = mergeList(DEFAULT_COLORS, s['顏色']);
-
-  eGrid.innerHTML = colorOpts.map(c => `
-    <div class="color-chip ${eSelected.includes(c)?'on':''}" data-color="${escapeAttr(c)}">
-      <span class="swatch" style="background:${colorOf(c)}"></span>${escapeHtml(c)}
-    </div>
-  `).join('');
-  eGrid.querySelectorAll('.color-chip').forEach(chip => {
-    chip.addEventListener('click', () => {
-      const c   = chip.dataset.color;
-      const idx = eSelected.indexOf(c);
-      if (idx >= 0) eSelected.splice(idx,1); else eSelected.push(c);
-      chip.classList.toggle('on');
-    });
-  });
-
   $('#eBack').addEventListener('click', () => renderOrderModal());
   $('#eDel').addEventListener('click', async () => {
     if (!confirm('確定刪除此訂單？相關完成紀錄也會一併刪除。')) return;
@@ -3051,19 +3082,13 @@ $('#eSave').addEventListener('click', async () => {
 
     try {
       await api('updateOrder', {
-        id:       o.id,
-        '下單日期': $('#e_date').value,
-        '交期':    $('#e_due').value,
-        '廠商':    $('#e_vendor').value,
-        '品項':    $('#e_item').value,
-        '款式':    $('#e_style').value,
-        '顏色':    eSelected.join('、'),
-        '大小':    $('#e_size').value,
-        '數量':    $('#e_qty').value,
-        '附加':    $('#e_pack').value,
-        '訂單編號': $('#e_order_no').value,
-        '備註':    $('#e_note').value
-      });
+  id:        o.id,
+  '下單日期': $('#e_date').value,
+  '交期':    $('#e_due').value,
+  '廠商':    $('#e_vendor').value,
+  '訂單編號': $('#e_order_no').value,
+  '備註':    $('#e_note').value
+});
       await loadAll();
       currentOrder = state.orders.find(x => x.id === o.id);
       renderOrderModal();
@@ -3087,8 +3112,8 @@ function renderPlatformForm() {
     todayRecs[p['平台']] = p;
   });
 
-  area.innerHTML = '<div class="pf-form">' + PLATFORM_ORDER.map(name => {
-    const opts     = PLATFORM_LOGISTICS[name] || [];
+  area.innerHTML = '<div class="pf-form">' + getPlatformOrder().map(name => {
+    const opts     = getPlatformLogistics()[name] || [];
     const existing = todayRecs[name];
     const map      = {};
     if (existing && Array.isArray(existing['明細'])) {
@@ -3138,7 +3163,24 @@ const numButtons = `
         </div>
       </div>
     `;
-  }).join('') + '</div>';
+  }).join('') + `
+  <div class="pf-form-card" style="border-left-color: var(--tape-purple); border-style: dashed;">
+    <div class="pf-form-head">
+      <span class="pf-name" style="color:var(--ink-soft);font-size:14px;">＋ 新增平台</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+      <div class="field" style="min-width:120px;flex:1;">
+        <label>平 台 名 稱</label>
+        <input type="text" id="inline_pm_name" placeholder="例：露天、MOMO…">
+      </div>
+      <div class="field" style="min-width:160px;flex:2;">
+        <label>物 流（逗號分隔，留空=總件數）</label>
+        <input type="text" id="inline_pm_logi" placeholder="黑貓,超商">
+      </div>
+      <button type="button" class="btn primary" id="inline_pm_add" style="padding:8px 18px;white-space:nowrap;">新 增</button>
+    </div>
+  </div>
+  </div>`;
 
 area.querySelectorAll('.pf-input').forEach(inp => {
     inp.addEventListener('input', () => updatePfSum(inp.dataset.pf));
@@ -3164,9 +3206,22 @@ area.querySelectorAll('.pf-num-btn').forEach(btn => {
   });
 });
 
-  PLATFORM_ORDER.forEach(updatePfSum);
+  getPlatformOrder().forEach(updatePfSum);
 }
-
+const inlineAddBtn = document.getElementById('inline_pm_add');
+  if (inlineAddBtn) {
+    inlineAddBtn.addEventListener('click', () => {
+      const name = document.getElementById('inline_pm_name').value.trim();
+      if (!name) { toast('請輸入平台名稱', true); return; }
+      if (getPlatformOrder().includes(name)) { toast('此平台已存在', true); return; }
+      const logiRaw = document.getElementById('inline_pm_logi').value.trim();
+      const logi = logiRaw ? logiRaw.split(/[,，]/).map(s => s.trim()).filter(Boolean) : [];
+      CUSTOM_PLATFORMS[name] = logi;
+      localStorage.setItem('customPlatforms_v1', JSON.stringify(CUSTOM_PLATFORMS));
+      toast(`已新增平台「${name}」`);
+      renderPlatformForm();
+    });
+  }
 function updatePfSum(name) {
   let sum = 0;
   document.querySelectorAll(`.pf-input[data-pf="${cssEscape(name)}"]`).forEach(inp => {
@@ -3194,8 +3249,8 @@ $('#pSubmit').addEventListener('click', async () => {
   const globalNote = $('#p_global_note').value;
   const items = [];
 
-  PLATFORM_ORDER.forEach(name => {
-    const opts = PLATFORM_LOGISTICS[name] || [];
+  getPlatformOrder().forEach(name => {
+    const opts = getPlatformLogistics()[name] || [];
     let detail = [], total = 0;
     if (!opts.length) {
       const inp = document.querySelector(`.pf-input[data-pf="${cssEscape(name)}"][data-logi="__total__"]`);
@@ -3253,7 +3308,7 @@ function openPlatformEdit(rec, platformName, overrideDate) {
   const date = isNew ? (overrideDate || $('#p_date').value || todayStr()) : fmtDate(rec['日期']);
 
   $('#pfmTitle').textContent = (isNew ? '新 增 ' : '編 輯 ') + platform;
-  const options = PLATFORM_LOGISTICS[platform] || [];
+  const options = getPlatformLogistics()[platform] || [];
   const map     = {};
   if (!isNew) (rec['明細']||[]).forEach(d => { map[d.物流] = d.件數 || 0; });
 
@@ -3422,6 +3477,69 @@ document.getElementById('cornerSettings').addEventListener('click', () => {
   btn.textContent = '↻ 更新';
   btn.disabled = false;
   toast('已更新');
+});
+/* ============ 平台管理 ============ */
+function renderPlatformMgmtList() {
+  const list = document.getElementById('pmExistingList');
+  const allOrder = getPlatformOrder();
+  const logistics = getPlatformLogistics();
+  
+  list.innerHTML = '<div style="font-size:12px;color:var(--ink-soft);letter-spacing:1px;margin-bottom:8px;">現有平台</div>' +
+    allOrder.map(name => {
+      const isDefault = DEFAULT_PLATFORM_ORDER.includes(name);
+      const logi = logistics[name] || [];
+      const logiStr = logi.length ? logi.join('、') : '總件數';
+      return `
+        <div style="display:flex;align-items:center;gap:8px;padding:7px 4px;border-bottom:1px dotted var(--line);">
+          <span style="flex:1;">
+            <b style="font-size:14px;">${escapeHtml(name)}</b>
+            <span style="font-size:12px;color:var(--ink-soft);margin-left:6px;">${escapeHtml(logiStr)}</span>
+          </span>
+          ${isDefault
+            ? '<span style="font-size:11px;color:var(--ink-soft);padding:2px 8px;">預設</span>'
+            : `<button class="btn small danger" style="padding:2px 10px;font-size:11px;" data-del-platform="${escapeAttr(name)}">刪除</button>`
+          }
+        </div>
+      `;
+    }).join('');
+
+  list.querySelectorAll('[data-del-platform]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const name = btn.dataset.delPlatform;
+      if (!confirm(`確定刪除平台「${name}」？`)) return;
+      delete CUSTOM_PLATFORMS[name];
+      localStorage.setItem('customPlatforms_v1', JSON.stringify(CUSTOM_PLATFORMS));
+      renderPlatformMgmtList();
+      renderPlatformForm();
+      toast('已刪除');
+    });
+  });
+}
+
+document.getElementById('openPlatformMgmt').addEventListener('click', () => {
+  renderPlatformMgmtList();
+  document.getElementById('platformMgmtModal').classList.add('show');
+});
+
+document.getElementById('pmSave').addEventListener('click', () => {
+  const name = document.getElementById('pmName').value.trim();
+  if (!name) { toast('請輸入平台名稱', true); return; }
+  if (getPlatformOrder().includes(name)) { toast('此平台已存在', true); return; }
+  
+  const logiRaw = document.getElementById('pmLogistics').value.trim();
+  const logi = logiRaw
+    ? logiRaw.split(/[,，]/).map(s => s.trim()).filter(Boolean)
+    : [];
+  
+  CUSTOM_PLATFORMS[name] = logi;
+  localStorage.setItem('customPlatforms_v1', JSON.stringify(CUSTOM_PLATFORMS));
+  
+  document.getElementById('pmName').value = '';
+  document.getElementById('pmLogistics').value = '';
+  
+  renderPlatformMgmtList();
+  renderPlatformForm();
+  toast(`已新增平台「${name}」`);
 });
 </script>
 </body>
