@@ -1927,6 +1927,7 @@ if (vendorFilter === 'open') {
       if (safeText(o['款式']))  specs.push(`<span>${escapeHtml(safeText(o['款式']))}</span>`);
       if (colorHtml)            specs.push(colorHtml);
       if (safeText(o['大小']))  specs.push(`<span>${escapeHtml(safeText(o['大小']))}</span>`);
+      
 
 const pack    = safeText(o['附加']);
       const orderNo = safeText(o['訂單編號']);
@@ -2080,6 +2081,13 @@ if (!vContainer) {
     const colors = String(o['顏色']||'').split(/[、,，]/).map(c=>c.trim()).filter(Boolean);
     const colorHtml = colors.map(c => `<span class="swatch" style="background:${colorOf(c)}"></span>${escapeHtml(c)}`).join(' ');
     const specPieces = [safeText(o['款式']), colorHtml, safeText(o['大小'])].filter(Boolean).join(' / ');
+    const itList = Array.isArray(o['items']) && o['items'].length ? o['items'] : null;
+const itemDisplay = itList
+  ? itList.map(it => safeText(it['品項'])).filter(Boolean).join('、')
+  : (safeText(o['品項']) || '—');
+const specDisplay = itList
+  ? itList.map(it => [safeText(it['款式']), safeText(it['大小'])].filter(Boolean).join(' ')).filter(Boolean).join(' / ')
+  : (specPieces || '—');
 
     let statusHtml = '';
     if (isHidden)      statusHtml = '<span class="status-pill" style="border-color:var(--dk-soft);color:var(--dk-soft);">已隱藏</span>';
@@ -2097,8 +2105,8 @@ if (!vContainer) {
       <td>${fmtDate(o['下單日期'])||'—'}</td>
       <td>${o['交期'] ? fmtDate(o['交期']) : '—'}</td>
       <td>${escapeHtml(safeText(o['廠商'])||'—')}</td>
-      <td><b>${escapeHtml(safeText(o['品項'])||'—')}</b></td>
-      <td>${specPieces||'—'}</td>
+  <td><b>${escapeHtml(itemDisplay)}</b></td>
+<td>${specDisplay}</td>
       <td class="num">${qty||'—'}</td>
       <td class="num ${doneClass}">${qty>0?done:'—'}</td>
       <td>${statusHtml}</td>
