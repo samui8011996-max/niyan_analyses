@@ -75,6 +75,7 @@ html, body {
   font-weight: 500;
   line-height: 1.7;
   min-height: 100vh;
+  overflow-x: hidden;        /* 保險：擋掉任何裝飾性的超出 */
 }
   body::before {
     content: '';
@@ -497,16 +498,11 @@ html, body {
     font-size: 11px;
     color: var(--ink-soft);
   }
-.pf-inputs .field {
-  min-width: 0;          /* 讓格子可以縮小，不被輸入框撐開 */
-}
 .pf-inputs input {
   font-size: 16px;
   font-weight: 700;
   padding: 6px 10px;
   text-align: center;
-  width: 100%;           /* 填滿格子 */
-  min-width: 0;          /* 允許縮到比預設更窄 */
 }
 /* 隱藏瀏覽器預設的數字上下箭頭 */
 .pf-inputs input[type=number]::-webkit-inner-spin-button,
@@ -1234,13 +1230,14 @@ z-index: 10;
     font-size: 18px;
   }
 
-  @media (max-width: 600px) {
-    .banner h1 { font-size: 26px; letter-spacing: 4px; }
-    .tab { padding: 6px 12px; font-size: 12px; }
-    .card { padding: 24px 14px 14px; }
-    .tape { left: 16px; }
-    .tape.t-blue { right: 16px; }
-  }
+@media (max-width: 600px) {
+  .banner h1 { font-size: 26px; letter-spacing: 4px; }
+  .tab { padding: 6px 12px; font-size: 12px; }
+  .card { padding: 24px 14px 14px; }
+  .tape { left: 16px; }
+  .tape.t-blue { right: 16px; }
+  .pf-inputs { grid-template-columns: 1fr; }   /* 手機上每個物流各佔一行 */
+}
 .corner-settings {
   position: absolute;
   top: 12px; right: 12px;
