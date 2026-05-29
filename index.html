@@ -585,7 +585,23 @@ html, body {
     background: #fff;
     color: var(--ink);
   }
-
+.pf-del-platform {
+  background: none;
+  border: 1px solid var(--line-dark);
+  color: var(--ink-soft);
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 14px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.pf-del-platform:hover {
+  background: var(--stamp-red);
+  color: #fff;
+  border-color: var(--stamp-red);
+}
   /* 平台單公告卡片 */
   .pf-grid {
     display: grid;
@@ -1323,9 +1339,7 @@ z-index: 10;
         <label>全域備註（選填）</label>
         <input type="text" id="p_global_note" placeholder="適用所有平台的備註…">
       </div>
-      <div class="field" style="margin-top:4px;">
-        <button class="btn small ghost" id="openPlatformMgmt" style="font-size:12px;">＋ 管 理 平 台</button>
-      </div>
+
     </div>
     </div>
     <div id="p_all_platforms"></div>
@@ -1570,10 +1584,11 @@ const DEFAULT_PLATFORM_LOGISTICS = {
   '瑪黑':     ['黑貓'],
   '官網':     ['黑貓','超商'],
   '博客來':   ['黑貓'],
+  'MO+':      ['黑貓','超商'],
   '酷澎':     []
 };
 
-const DEFAULT_PLATFORM_ORDER = ['Line禮物','蝦皮','Pinkoi','瑪黑','官網','博客來','酷澎'];
+const DEFAULT_PLATFORM_ORDER = ['Line禮物','蝦皮','Pinkoi','瑪黑','官網','博客來','MO+','酷澎'];
 
 
 
@@ -1922,11 +1937,16 @@ function renderVendorBoard() {
       const itList = Array.isArray(o['items']) && o['items'].length ? o['items'] : null;
 
       const itemsHtml = itList ? itList.map(it => {
-        const itColors = String(it['顏色'] || '').split(/[、,，]/).map(c => c.trim()).filter(Boolean);
-        const itColorHtml = itColors.map(c =>
-          `<span class="color-tag"><span class="swatch" style="background:${colorOf(c)}"></span>${escapeHtml(c)}</span>`
-        ).join('');
-        const itSpecs = [safeText(it['款式']), itColorHtml, safeText(it['大小'])].filter(Boolean).join(' ');
+const itColors = String(it['顏色'] || '').split(/[、,，]/).map(c => c.trim()).filter(Boolean);
+        const itColorHtml = itColors.map(c => {
+          const dot = DEFAULT_COLORS.includes(c)
+            ? `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${colorOf(c)};border:1px solid rgba(0,0,0,.15);vertical-align:middle;margin-right:3px;"></span>`
+            : '';
+          return `<span style="white-space:nowrap;">${dot}${escapeHtml(c)}</span>`;
+        }).join(' ');
+        const itSz = safeText(it['大小']);
+        const itSt = safeText(it['款式']);
+        const itSpecs = [itSz ? `【${escapeHtml(itSz)}】` : '', itColorHtml, itSt ? escapeHtml(itSt) : ''].filter(Boolean).join(' ');
         const itQty = Number(it['數量']) || 0;
         const itDone = itemDoneCount(o.id, it);
         const itPack = safeText(it['附加']);
@@ -2073,7 +2093,7 @@ const itemDisplay = itList
   ? itList.map(it => safeText(it['品項'])).filter(Boolean).join('、')
   : (safeText(o['品項']) || '—');
 const specDisplay = itList
-  ? itList.map(it => [safeText(it['款式']), safeText(it['大小'])].filter(Boolean).join(' ')).filter(Boolean).join(' / ')
+  ? itList.map(it => [`【${safeText(it['大小'])}】`, safeText(it['顏色']), safeText(it['款式'])].filter(s => s && s !== '【】').join(' ')).filter(Boolean).join(' / ')
   : (specPieces || '—');
 
     let statusHtml = '';
@@ -2425,6 +2445,7 @@ function createItemRow(data = {}) {
           <div class="chip fi-chip" data-pack="bare">裸裝</div>
           <div class="chip fi-chip" data-pack="seal">封條</div>
           <div class="chip fi-chip" data-pack="card">小卡</div>
+          <div class="chip fi-chip" data-pack="wood">木片</div>
         </div>
         <div class="pack-detail" id="fi-pack-oil-${i}">
           <div class="pack-detail-row">
@@ -2443,13 +2464,19 @@ function createItemRow(data = {}) {
         <div class="pack-detail" id="fi-pack-seal-${i}">
           <div class="pack-detail-row">
             <label>封條種類</label>
-            <input type="text" class="fi-seal" placeholder="輸入種類">
+            <input type="text" class="fi-seal" placeholder="輸入種類（選填）">
           </div>
         </div>
-        <div class="pack-detail" id="fi-pack-card-${i}">
+       <div class="pack-detail" id="fi-pack-card-${i}">
           <div class="pack-detail-row">
             <label>小卡種類</label>
-            <input type="text" class="fi-card" placeholder="輸入種類">
+            <input type="text" class="fi-card" placeholder="輸入種類（選填）">
+          </div>
+        </div>
+        <div class="pack-detail" id="fi-pack-wood-${i}">
+          <div class="pack-detail-row">
+            <label>雷雕字樣</label>
+            <input type="text" class="fi-wood" placeholder="輸入字樣（選填）">
           </div>
         </div>
       </div>
@@ -2457,8 +2484,12 @@ function createItemRow(data = {}) {
   `;
 
   // 顏色 chip
-  div.querySelectorAll('.color-chip').forEach(chip => {
-    chip.addEventListener('click', () => chip.classList.toggle('on'));
+div.querySelectorAll('.color-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const wasOn = chip.classList.contains('on');
+      div.querySelectorAll('.color-chip').forEach(c => c.classList.remove('on'));
+      if (!wasOn) chip.classList.add('on');
+    });
   });
   div.querySelector('.color-add').addEventListener('click', () => openAddModal('顏色'));
 
@@ -2518,10 +2549,15 @@ function collectItemAdditional(div) {
     const t = div.querySelector('.fi-seal')?.value.trim() || '';
     parts.push('封條' + (t?'（'+t+'）':''));
   }
-  const cardChip = div.querySelector('.fi-chip[data-pack="card"]');
+const cardChip = div.querySelector('.fi-chip[data-pack="card"]');
   if (cardChip?.classList.contains('on')) {
     const t = div.querySelector('.fi-card')?.value.trim() || '';
     parts.push('小卡' + (t?'（'+t+'）':''));
+  }
+  const woodChip = div.querySelector('.fi-chip[data-pack="wood"]');
+  if (woodChip?.classList.contains('on')) {
+    const t = div.querySelector('.fi-wood')?.value.trim() || '';
+    parts.push('木片' + (t?'（'+t+'）':''));
   }
   return parts.join('、');
 }
@@ -2741,19 +2777,24 @@ let html = `
       const itColors = String(it['顏色']||'').split(/[、,，]/).map(c=>c.trim()).filter(Boolean);
       const itColorHtml = itColors.map(c=>`<span style="display:inline-flex;align-items:center;gap:3px;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${colorOf(c)};border:1px solid rgba(0,0,0,.15);"></span>${escapeHtml(c)}</span>`).join(' ');
       const itQty = Number(it['數量'])||0;
-      const itPack = it['附加'] ? `📦${escapeHtml(it['附加'])}` : '';
-return `<div style="background:var(--paper-2);border-radius:6px;padding:8px 10px;margin-bottom:6px;">
+      const itDone = itemDoneCount(o.id, it);
+      const itRemain = Math.max(0, itQty - itDone);
+      const itFull = itQty > 0 && itRemain === 0;
+      const itPack = safeText(it['附加']);
+      return `<div style="background:var(--paper-2);border-radius:6px;padding:8px 10px;margin-bottom:6px;${itFull?'opacity:.55;':''}">
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-    <span style="flex:1;font-size:13px;"><b>${escapeHtml(safeText(it['品項'])||'—')}</b> ${escapeHtml(safeText(it['款式']))} ${itColorHtml} ${escapeHtml(safeText(it['大小']))}${itPack?`<br><span style="font-size:11px;color:var(--ink-soft);">📦 ${escapeHtml(itPack)}</span>`:''}</span>
-    <span style="font-family:'Shippori Mincho',serif;font-weight:700;font-size:15px;white-space:nowrap;">× ${itQty}</span>
+<span style="flex:1;font-size:13px;"><b>${escapeHtml(safeText(it['品項'])||'—')}</b>【${escapeHtml(safeText(it['大小']))}】 ${itColorHtml} ${escapeHtml(safeText(it['款式']))}${itPack?`<br><span style="font-size:11px;color:var(--ink-soft);">📦 ${escapeHtml(itPack)}</span>`:''}</span>
+    <span style="font-family:'Shippori Mincho',serif;font-weight:700;font-size:15px;white-space:nowrap;margin-left:auto;">
+      <span style="color:var(--stamp-blue);">${itDone}</span><span style="color:var(--line-dark);margin:0 3px;">/</span>${itQty}
+    </span>
   </div>
   <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-    <input type="number" class="it-qty" min="0" max="${itQty}" placeholder="0" data-item-idx="${idx}"
+    <input type="number" class="it-qty" min="0" max="${itRemain}" placeholder="0" data-item-idx="${idx}" ${itFull?'disabled':''}
       style="width:70px;text-align:center;font-size:16px;font-weight:700;padding:4px 8px;border-radius:6px;border:1.5px solid var(--accent);background:#fff;">
-    <button type="button" class="pf-num-btn" data-it-idx="${idx}" data-it-add="1">+1</button>
-    <button type="button" class="pf-num-btn" data-it-idx="${idx}" data-it-add="5">+5</button>
-    <button type="button" class="pf-num-btn" data-it-idx="${idx}" data-it-add="10">+10</button>
-    <button type="button" class="pf-num-btn" data-it-idx="${idx}" data-it-add="50">+50</button>
+    <button type="button" class="pf-num-btn" data-it-idx="${idx}" data-it-add="1" ${itFull?'disabled':''}>+1</button>
+    <button type="button" class="pf-num-btn" data-it-idx="${idx}" data-it-add="5" ${itFull?'disabled':''}>+5</button>
+    <button type="button" class="pf-num-btn" data-it-idx="${idx}" data-it-add="10" ${itFull?'disabled':''}>+10</button>
+    <button type="button" class="pf-num-btn" data-it-idx="${idx}" data-it-add="50" ${itFull?'disabled':''}>+50</button>
     <button type="button" class="pf-num-btn clear" data-it-idx="${idx}" data-it-clear="1">清除</button>
   </div>
 </div>`;
@@ -2814,10 +2855,16 @@ return `<div style="background:var(--paper-2);border-radius:6px;padding:8px 10px
     html += `<div style="border-top:1px dashed var(--line);padding-top:12px;margin-top:8px;">
       <div style="font-size:12px;color:var(--ink-soft);margin-bottom:6px;letter-spacing:2px;">完成紀錄</div>`;
     progress.forEach(p => {
-      const metaPieces = [];
-      if (p['總箱數'])   metaPieces.push('箱數：'+p['總箱數']);
-      if (safeText(p['物流公司'])) metaPieces.push('物流：'+safeText(p['物流公司']));
-      if (safeText(p['備註']))     metaPieces.push(safeText(p['備註']));
+  const metaPieces = [];
+if (p['總箱數'])   metaPieces.push('箱數：'+p['總箱數']);
+if (safeText(p['物流公司'])) metaPieces.push('物流：'+safeText(p['物流公司']));
+if (safeText(p['備註'])) {
+  // 重新排列備註中的品項資訊順序：品項【大小】顏色 款式
+  const raw = safeText(p['備註']);
+  // 備註格式為「品項 款式 大小」，嘗試重排
+  // 直接顯示即可（新紀錄已按正確順序寫入）
+  metaPieces.push(raw);
+}
       html += `
         <div class="progress-entry">
           <span class="who">${escapeHtml(safeText(p['包貨人員'])||'—')}</span>
@@ -2838,18 +2885,22 @@ return `<div style="background:var(--paper-2);border-radius:6px;padding:8px 10px
     </div>
   `;
   $('#omBody').innerHTML = html;
-  $('#omBody').querySelectorAll('[data-it-add]').forEach(b => {
-  b.addEventListener('click', () => {
-    const inp = $('#omBody').querySelector(`.it-qty[data-item-idx="${b.dataset.itIdx}"]`);
-    if (inp) inp.value = (Number(inp.value)||0) + Number(b.dataset.itAdd);
+$('#omBody').querySelectorAll('[data-it-add]').forEach(b => {
+    b.addEventListener('click', () => {
+      const inp = $('#omBody').querySelector(`.it-qty[data-item-idx="${b.dataset.itIdx}"]`);
+      if (!inp || inp.disabled) return;
+      const max = Number(inp.getAttribute('max')) || 0;
+      let next = (Number(inp.value)||0) + Number(b.dataset.itAdd);
+      if (max > 0 && next > max) next = max;   // 不超過剩餘
+      inp.value = next > 0 ? next : '';
+    });
   });
-});
-$('#omBody').querySelectorAll('[data-it-clear]').forEach(b => {
-  b.addEventListener('click', () => {
-    const inp = $('#omBody').querySelector(`.it-qty[data-item-idx="${b.dataset.itIdx}"]`);
-    if (inp) inp.value = '';
+  $('#omBody').querySelectorAll('[data-it-clear]').forEach(b => {
+    b.addEventListener('click', () => {
+      const inp = $('#omBody').querySelector(`.it-qty[data-item-idx="${b.dataset.itIdx}"]`);
+      if (inp) inp.value = '';
+    });
   });
-});
 
   // 多品項加減按鈕
   $('#omBody').querySelectorAll('.it-add').forEach(b => {
@@ -2867,18 +2918,17 @@ $('#omBody').querySelectorAll('[data-it-clear]').forEach(b => {
 
 const chk = $('#checkAll'), pQty = $('#pQty');
   if (chk) {
-   chk.addEventListener('change', () => {
-  if (itList) {
-    $('#omBody').querySelectorAll('.it-qty').forEach(inp => {
-      inp.value = chk.checked ? inp.getAttribute('max') : '';
+    chk.addEventListener('change', () => {
+      if (itList) {
+        $('#omBody').querySelectorAll('.it-qty').forEach(inp => {
+          const remain = Number(inp.getAttribute('max')) || 0;
+          inp.value = (chk.checked && remain > 0) ? remain : '';   // 只填剩餘，做完的不填
+        });
+      } else if (pQty) {
+        pQty.value = chk.checked ? remaining : '';
+        pQty.dispatchEvent(new Event('input'));
+      }
     });
-  } else if (pQty) {
-    pQty.value = chk.checked ? remaining : '';
-    pQty.dispatchEvent(new Event('input'));
-  }
-});
-    
-    // 同步單一品項的輸入框狀態
     if (pQty) {
       pQty.addEventListener('input', () => { chk.checked = (Number(pQty.value) >= remaining && remaining > 0); });
     }
@@ -2969,7 +3019,7 @@ async function addOrderProgress() {
           '總箱數':   boxes,
           '物流公司': logi,
           '包貨人員': staff,
-          '備註': `${safeText(e.it['品項'])} ${safeText(e.it['款式'])} ${safeText(e.it['大小'])}`.trim()
+          '備註': `${safeText(e.it['品項'])}【${safeText(e.it['大小'])}】 ${safeText(e.it['顏色'])} ${safeText(e.it['款式'])}`.trim()
         });
       }
       await loadAll();
@@ -3099,9 +3149,12 @@ $('#eSave').addEventListener('click', async () => {
 }
 
 /* ============ 平台單表單 ============ */
-function renderPlatformForm() {
+function renderPlatformForm(force) {
   const area      = $('#p_all_platforms');
+  // 打字時跳過自動重建；force=true 時強制重建（新增/刪除平台用）
+  if (!force && area && area.contains(document.activeElement)) return;
   const date      = $('#p_date').value || todayStr();
+
   const todayRecs = {};
   state.platforms.filter(p => fmtDate(p['日期']) === date).forEach(p => {
     todayRecs[p['平台']] = p;
@@ -3148,9 +3201,10 @@ const numButtons = `
 
     return `
       <div class="pf-form-card" data-platform="${escapeAttr(name)}">
-        <div class="pf-form-head">
+<div class="pf-form-head">
           <span class="pf-name">${name}</span>
           <span class="pf-sum">小計 <b data-sum="${escapeAttr(name)}">0</b></span>
+          ${!DEFAULT_PLATFORM_ORDER.includes(name) ? `<button type="button" class="pf-del-platform" data-del-platform="${escapeAttr(name)}" title="刪除平台">×</button>` : ''}
         </div>
         <div class="pf-inputs">${inputs}</div>
         <div class="pf-form-note">
@@ -3158,49 +3212,17 @@ const numButtons = `
         </div>
       </div>
     `;
-  }).join('') + `
-<div class="pf-form-card" style="border-left-color: var(--tape-purple); border-style: dashed;">
+ }).join('') + `
+  <div class="pf-form-card" style="border-left-color: var(--tape-purple); border-style: dashed;">
     <div class="pf-form-head">
       <span class="pf-name" style="color:var(--ink-soft);font-size:14px;">＋ 新增平台</span>
     </div>
-    <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:12px;">
+    <div style="display:flex;gap:8px;align-items:flex-end;">
       <div class="field" style="flex:1;">
         <label>平 台 名 稱</label>
         <input type="text" id="inline_pm_name" placeholder="例：露天、MOMO…">
       </div>
       <button type="button" class="btn primary" id="inline_pm_add" style="padding:8px 18px;white-space:nowrap;">新 增</button>
-    </div>
-    <div id="inline_pm_inputs" style="display:none;">
-      <div class="pf-inputs">
-        <div class="field">
-          <label>黑 貓</label>
-          <input type="number" min="0" class="inline-logi-input" data-logi="黑貓" placeholder="0">
-          <div class="pf-num-btns">
-            <button type="button" class="pf-num-btn" data-inline-delta="1">+1</button>
-            <button type="button" class="pf-num-btn" data-inline-delta="5">+5</button>
-            <button type="button" class="pf-num-btn" data-inline-delta="10">+10</button>
-            <button type="button" class="pf-num-btn" data-inline-delta="50">+50</button>
-            <button type="button" class="pf-num-btn clear" data-inline-clear="黑貓">清除</button>
-          </div>
-        </div>
-        <div class="field">
-          <label>超 商</label>
-          <input type="number" min="0" class="inline-logi-input" data-logi="超商" placeholder="0">
-          <div class="pf-num-btns">
-            <button type="button" class="pf-num-btn" data-inline-delta="1">+1</button>
-            <button type="button" class="pf-num-btn" data-inline-delta="5">+5</button>
-            <button type="button" class="pf-num-btn" data-inline-delta="10">+10</button>
-            <button type="button" class="pf-num-btn" data-inline-delta="50">+50</button>
-            <button type="button" class="pf-num-btn clear" data-inline-clear="超商">清除</button>
-          </div>
-        </div>
-      </div>
-      <div class="pf-form-note" style="margin-top:8px;">
-        <input type="text" id="inline_pm_note" placeholder="備註">
-      </div>
-      <div style="text-align:right;margin-top:10px;">
-        <button type="button" class="btn primary" id="inline_pm_submit">送 出</button>
-      </div>
     </div>
   </div>
   </div>`;
@@ -3230,17 +3252,37 @@ area.querySelectorAll('.pf-num-btn').forEach(btn => {
 });
 
   getPlatformOrder().forEach(updatePfSum);
-  // inline 新增平台
-  const inlineAddBtn = document.getElementById('inline_pm_add');
-  if (inlineAddBtn) {
-    inlineAddBtn.addEventListener('click', () => {
-      const name = document.getElementById('inline_pm_name').value.trim();
+// 新增平台（一步完成）
+  const inlineAddBtn  = document.getElementById('inline_pm_add');
+  const inlineNameInp = document.getElementById('inline_pm_name');
+  if (inlineAddBtn && inlineNameInp) {
+    const doAddPlatform = () => {
+      const name = inlineNameInp.value.trim();
       if (!name) { toast('請輸入平台名稱', true); return; }
       if (getPlatformOrder().includes(name)) { toast('此平台已存在', true); return; }
-      document.getElementById('inline_pm_inputs').style.display = 'block';
-      inlineAddBtn.style.display = 'none';
+      CUSTOM_PLATFORMS[name] = ['黑貓', '超商'];
+      localStorage.setItem('customPlatforms_v1', JSON.stringify(CUSTOM_PLATFORMS));
+      toast(`已新增平台「${name}」`);
+      renderPlatformForm(true);
+    };
+    inlineAddBtn.addEventListener('click', doAddPlatform);
+    inlineNameInp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); doAddPlatform(); }
     });
   }
+
+  // 刪除平台（卡片右上角 ×）
+  area.querySelectorAll('[data-del-platform]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const name = btn.dataset.delPlatform;
+      if (!confirm(`確定刪除平台「${name}」？`)) return;
+      delete CUSTOM_PLATFORMS[name];
+      localStorage.setItem('customPlatforms_v1', JSON.stringify(CUSTOM_PLATFORMS));
+      toast('已刪除');
+      renderPlatformForm(true);
+    });
+  });
 
   const inlineSubmitBtn = document.getElementById('inline_pm_submit');
   if (inlineSubmitBtn) {
@@ -3589,7 +3631,7 @@ function renderPlatformMgmtList() {
   });
 }
 
-document.getElementById('openPlatformMgmt').addEventListener('click', () => {
+document.getElementById('openPlatformMgmt')?.addEventListener('click', () => {
   renderPlatformMgmtList();
   document.getElementById('platformMgmtModal').classList.add('show');
 });
