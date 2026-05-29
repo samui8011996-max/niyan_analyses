@@ -532,11 +532,11 @@ html, body {
 }
 .pf-num-btn {
   flex: 1;
-  min-width: 0px;
+  min-width: 38px;
   font-family: 'Klee One', serif;
   font-size: 13px;
   font-weight: 600;
-  padding: 4px 8px;
+  padding: 4px 0;
   background: var(--paper-2);
   color: var(--ink);
   border: 1px solid var(--accent-soft);
@@ -1342,11 +1342,12 @@ z-index: 10;
 
     </div>
     </div>
-<div id="p_all_platforms"></div>
-    <div class="btn-row" style="padding: 0 20px 20px;">
+    <div id="p_all_platforms"></div>
+    <div class="btn-row">
       <button class="btn ghost" id="pReset">清 空</button>
       <button class="btn primary" id="pSubmit">送 出</button>
     </div>
+  </div>
 </section>
     <!-- 新廠商單 -->
 <section class="section" id="sec-vendor">
@@ -1408,7 +1409,8 @@ z-index: 10;
     <!-- 歷史 -->
     <section class="section" id="sec-history">
 
-     
+
+
       <!-- 平台單歷史 -->
       <div class="his-card">
         <div class="his-title">
@@ -1437,8 +1439,9 @@ z-index: 10;
           <table class="his-table" id="hisPlatformTable"></table>
         </div>
       </div>
-    </section>
- <!-- 廠商單歷史 -->
+
+
+            <!-- 廠商單歷史 -->
       <div class="his-card">
         <div class="his-title">
           <span class="dot"></span>
@@ -1465,6 +1468,8 @@ z-index: 10;
           <table class="his-table" id="hisVendorTable"></table>
         </div>
       </div>
+    </section>
+    
 
     <!-- 設定 -->
     <section class="section" id="sec-settings">
