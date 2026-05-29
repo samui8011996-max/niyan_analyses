@@ -1409,34 +1409,7 @@ z-index: 10;
     <!-- 歷史 -->
     <section class="section" id="sec-history">
 
-      <!-- 廠商單歷史 -->
-      <div class="his-card">
-        <div class="his-title">
-          <span class="dot"></span>
-          <span>廠 商 訂 單 歷 史</span>
-          <span class="count" id="hisVendorCount"></span>
-        </div>
-        <div class="his-filter">
-          <label>狀態</label>
-          <select id="hisVStatus">
-            <option value="">全部</option>
-            <option value="open">未完成</option>
-            <option value="done">已完成</option>
-            <option value="hidden">已隱藏</option>
-          </select>
-          <label>下單日</label>
-          <input type="date" id="hisVDate">
-          <label>廠商</label>
-          <select id="hisVVendor"><option value="">全部</option></select>
-          <label>品項</label>
-          <input type="text" id="hisVItem" placeholder="搜尋…">
-          <button class="btn small" id="hisVClear">清除</button>
-        </div>
-        <div class="his-table-wrap">
-          <table class="his-table" id="hisVendorTable"></table>
-        </div>
-      </div>
-
+     
       <!-- 平台單歷史 -->
       <div class="his-card">
         <div class="his-title">
@@ -1466,6 +1439,33 @@ z-index: 10;
         </div>
       </div>
     </section>
+ <!-- 廠商單歷史 -->
+      <div class="his-card">
+        <div class="his-title">
+          <span class="dot"></span>
+          <span>廠 商 訂 單 歷 史</span>
+          <span class="count" id="hisVendorCount"></span>
+        </div>
+        <div class="his-filter">
+          <label>狀態</label>
+          <select id="hisVStatus">
+            <option value="">全部</option>
+            <option value="open">未完成</option>
+            <option value="done">已完成</option>
+            <option value="hidden">已隱藏</option>
+          </select>
+          <label>下單日</label>
+          <input type="date" id="hisVDate">
+          <label>廠商</label>
+          <select id="hisVVendor"><option value="">全部</option></select>
+          <label>品項</label>
+          <input type="text" id="hisVItem" placeholder="搜尋…">
+          <button class="btn small" id="hisVClear">清除</button>
+        </div>
+        <div class="his-table-wrap">
+          <table class="his-table" id="hisVendorTable"></table>
+        </div>
+      </div>
 
     <!-- 設定 -->
     <section class="section" id="sec-settings">
