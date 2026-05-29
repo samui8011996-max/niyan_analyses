@@ -1694,11 +1694,20 @@ function doneOf(orderId) {
   return state.progress.filter(p => p['訂單id'] === orderId)
     .reduce((s, p) => s + (Number(p['完成數量']) || 0), 0);
 }
-
+function itemMatchStr(it) {
+  return `${safeText(it['品項'])} ${safeText(it['款式'])} ${safeText(it['大小'])}`.trim();
+}
+function itemDoneCount(orderId, it) {
+  const m = itemMatchStr(it);
+  return progressOf(orderId)
+    .filter(p => safeText(p['備註']) === m)
+    .reduce((s, p) => s + (Number(p['完成數量']) || 0), 0);
+}
 function isOrderDone(o) {
   const itList = Array.isArray(o['items']) && o['items'].length ? o['items'] : null;
   if (itList) {
-    return itList.every(it => isDone(it['已完成']));
+    // 每個品項的進度都 ≥ 數量，整張單才算完成
+    return itList.every(it => itemDoneCount(o.id, it) >= (Number(it['數量']) || 0));
   }
   const qty = Number(o['數量']) || 0;
   return isDone(o['已完成']) || (qty > 0 && doneOf(o.id) >= qty);
@@ -1875,7 +1884,6 @@ const targets = state.platforms.filter(p =>
   }
 });
 
-/* ----- 廠商單公告 ----- */
 function renderVendorBoard() {
   const list = $('#vendorList');
   let orders = state.orders.slice();
@@ -1884,98 +1892,77 @@ function renderVendorBoard() {
   const hiddenCount = orders.length - visibleAll.length;
   orders = visibleAll;
 
-if (vendorFilter === 'open') {
-  orders = orders.filter(o => {
-    const qty = Number(o['數量']) || 0;
-    return !isDone(o['已完成']) && (qty === 0 || doneOf(o.id) < qty);
-  });
-} else if (vendorFilter === 'done') {
-  orders = orders.filter(o => {
-    const qty = Number(o['數量']) || 0;
-    return isDone(o['已完成']) || (qty > 0 && doneOf(o.id) >= qty);
-  });
-}
+  // 狀態篩選：統一用 isOrderDone
+  if (vendorFilter === 'open') {
+    orders = orders.filter(o => !isOrderDone(o));
+  } else if (vendorFilter === 'done') {
+    orders = orders.filter(o => isOrderDone(o));
+  }
   if (vendorDate) {
     orders = orders.filter(o => fmtDate(o['下單日期']) === vendorDate);
   }
 
-  orders.sort((a,b) => {
-    const aDone = Number(a['數量']) > 0 && doneOf(a.id) >= Number(a['數量']);
-    const bDone = Number(b['數量']) > 0 && doneOf(b.id) >= Number(b['數量']);
+  // 排序：未完成在前 → 交期早在前 → 新建立在前
+  orders.sort((a, b) => {
+    const aDone = isOrderDone(a);
+    const bDone = isOrderDone(b);
     if (aDone !== bDone) return aDone ? 1 : -1;
     const aDue = a['交期'] || '9999-99-99';
     const bDue = b['交期'] || '9999-99-99';
     if (aDue !== bDue) return aDue < bDue ? -1 : 1;
-    return (b['建立時間']||'').localeCompare(a['建立時間']||'');
+    return (b['建立時間'] || '').localeCompare(a['建立時間'] || '');
   });
 
   if (!orders.length) {
     list.innerHTML = '<div class="empty" style="grid-column:1/-1;">尚無廠商訂單</div>';
   } else {
     list.innerHTML = orders.map(o => {
-      const qty  = Number(o['數量']) || 0;
-      const done = doneOf(o.id);
-      const isDone   = isOrderDone(o);
-      const isUrgent = o['交期'] && o['交期'] === todayStr() && !isDone;
-      const pct  = qty > 0 ? Math.min(100, done/qty*100) : 0;
+      const isDoneOrder = isOrderDone(o);
+      const isUrgent = o['交期'] && o['交期'] === todayStr() && !isDoneOrder;
+      const itList = Array.isArray(o['items']) && o['items'].length ? o['items'] : null;
 
-      const colors = String(o['顏色']||'').split(/[、,，]/).map(c => c.trim()).filter(Boolean);
-      const colorHtml = colors.map(c => `
-        <span class="color-tag"><span class="swatch" style="background:${colorOf(c)}"></span>${escapeHtml(c)}</span>
-      `).join('');
-      const specs = [];
-      if (safeText(o['款式']))  specs.push(`<span>${escapeHtml(safeText(o['款式']))}</span>`);
-      if (colorHtml)            specs.push(colorHtml);
-      if (safeText(o['大小']))  specs.push(`<span>${escapeHtml(safeText(o['大小']))}</span>`);
-      
+      const itemsHtml = itList ? itList.map(it => {
+        const itColors = String(it['顏色'] || '').split(/[、,，]/).map(c => c.trim()).filter(Boolean);
+        const itColorHtml = itColors.map(c =>
+          `<span class="color-tag"><span class="swatch" style="background:${colorOf(c)}"></span>${escapeHtml(c)}</span>`
+        ).join('');
+        const itSpecs = [safeText(it['款式']), itColorHtml, safeText(it['大小'])].filter(Boolean).join(' ');
+        const itQty = Number(it['數量']) || 0;
+        const itDone = itemDoneCount(o.id, it);
+        const itPack = safeText(it['附加']);
+        return `<div style="padding:4px 0;border-bottom:1px dotted var(--line);font-size:13px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <span><b>${escapeHtml(safeText(it['品項']) || '—')}</b>${itSpecs ? ` <span style="color:var(--ink-soft);font-size:12px;">${itSpecs}</span>` : ''}</span>
+            <span style="font-family:'Shippori Mincho',serif;font-weight:700;margin-left:8px;">
+              <span style="color:var(--stamp-blue);">${itDone}</span>
+              <span style="color:var(--line-dark);margin:0 4px;">/</span>
+              <span>${itQty || '—'}</span>
+            </span>
+          </div>
+          ${itPack ? `<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">📦 ${escapeHtml(itPack)}</div>` : ''}
+        </div>`;
+      }).join('') : '';
 
-const pack    = safeText(o['附加']);
       const orderNo = safeText(o['訂單編號']);
-      const note    = safeText(o['備註']);
+      const note = safeText(o['備註']);
 
       return `
-        <div class="vendor-card ${isDone?'done':''} ${isUrgent?'urgent':''}" data-id="${o.id}">
+        <div class="vendor-card ${isDoneOrder ? 'done' : ''} ${isUrgent ? 'urgent' : ''}" data-id="${o.id}">
           <button class="card-hide-btn" data-hide-v="${o.id}" title="隱藏">×</button>
           <div class="vc-date">
-            下單 ${fmtDate(o['下單日期'])||'—'}
+            下單 ${fmtDate(o['下單日期']) || '—'}
             ${o['交期'] ? `<span class="due">／ 交期 ${fmtDate(o['交期'])}</span>` : ''}
           </div>
           ${safeText(o['廠商']) ? `<div class="vc-vendor">${escapeHtml(safeText(o['廠商']))}</div>` : ''}
-          ${!Array.isArray(o['items']) || !o['items'].length ? `<div class="vc-item">${escapeHtml(safeText(o['品項'])||'（未指定）')}</div>` : ''}
-    ${(() => {
-  const itList = Array.isArray(o['items']) && o['items'].length ? o['items'] : null;
-  if (!itList) return '';
-  return itList.map(it => {
-    const itColors = String(it['顏色']||'').split(/[、,，]/).map(c=>c.trim()).filter(Boolean);
-    const itColorHtml = itColors.map(c=>`<span class="color-tag"><span class="swatch" style="background:${colorOf(c)}"></span>${escapeHtml(c)}</span>`).join('');
-    const itSpecs = [safeText(it['款式']), itColorHtml, safeText(it['大小'])].filter(Boolean).join(' ');
-    const itQty = Number(it['數量'])||0;
-    const itMatchStr = `${safeText(it['品項'])} ${safeText(it['款式'])} ${safeText(it['大小'])}`.trim();
-    const itDone = progressOf(o.id)
-      .filter(p => safeText(p['備註']) === itMatchStr)
-      .reduce((s, p) => s + (Number(p['完成數量']) || 0), 0);
-const itPack = safeText(it['附加']);
-return `<div style="padding:4px 0;border-bottom:1px dotted var(--line);font-size:13px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;">
-        <span><b>${escapeHtml(safeText(it['品項'])||'—')}</b>${itSpecs?` <span style="color:var(--ink-soft);font-size:12px;">${itSpecs}</span>`:''}</span>
-        <span style="font-family:'Shippori Mincho',serif;font-weight:700;margin-left:8px;">
-          <span style="color:var(--stamp-blue);">${itDone}</span>
-          <span style="color:var(--line-dark);margin:0 4px;">/</span>
-          <span>${itQty||'—'}</span>
-        </span>
-      </div>
-      ${itPack ? `<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">📦 ${escapeHtml(itPack)}</div>` : ''}
-    </div>`;
-  }).join('');
-})()}
-
+          ${!itList ? `<div class="vc-item">${escapeHtml(safeText(o['品項']) || '（未指定）')}</div>` : ''}
+          ${itemsHtml}
           ${orderNo ? `<div class="vc-note" style="color:var(--stamp-blue);font-size:12px;">🔖 ${escapeHtml(orderNo)}</div>` : ''}
-          ${note    ? `<div class="vc-note">${escapeHtml(note)}</div>` : ''}
+          ${note ? `<div class="vc-note">${escapeHtml(note)}</div>` : ''}
         </div>
       `;
     }).join('');
   }
-  // 隱藏顯示切換
+
   const toggle = $('#vendorHiddenToggle');
   if (hiddenCount > 0) {
     toggle.innerHTML = `<button id="vendorShowHidden">顯示已隱藏的 ${hiddenCount} 個</button>`;
