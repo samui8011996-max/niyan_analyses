@@ -497,11 +497,16 @@ html, body {
     font-size: 11px;
     color: var(--ink-soft);
   }
+.pf-inputs .field {
+  min-width: 0;          /* 讓格子可以縮小，不被輸入框撐開 */
+}
 .pf-inputs input {
   font-size: 16px;
   font-weight: 700;
   padding: 6px 10px;
   text-align: center;
+  width: 100%;           /* 填滿格子 */
+  min-width: 0;          /* 允許縮到比預設更窄 */
 }
 /* 隱藏瀏覽器預設的數字上下箭頭 */
 .pf-inputs input[type=number]::-webkit-inner-spin-button,
