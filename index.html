@@ -1229,7 +1229,6 @@ z-index: 10;
     font-family: 'Caveat', cursive;
     font-size: 18px;
   }
-
 @media (max-width: 600px) {
   .banner h1 { font-size: 26px; letter-spacing: 4px; }
   .tab { padding: 6px 12px; font-size: 12px; }
@@ -1237,7 +1236,8 @@ z-index: 10;
   .tape { left: 16px; }
   .tape.t-blue { right: 16px; }
   .pf-inputs { grid-template-columns: 1fr; }
-  .pf-inputs .pf-num-btn { flex: 0 1 auto; padding: 4px 14px; }   /* 按鈕不撐滿、靠左、給左右內距 */
+  .pf-inputs .pf-num-btn { flex: 0 1 auto; padding: 4px 14px; }
+  .pf-inputs input { max-width: 120px; }    /* ← 加這行 */
 }
 .corner-settings {
   position: absolute;
