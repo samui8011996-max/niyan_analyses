@@ -1280,8 +1280,8 @@ z-index: 10;
 
     <div class="tabs">
       <button class="tab active" data-tab="board">公 告</button>
-      <button class="tab" data-tab="vendor">新 廠 商 單</button>
       <button class="tab" data-tab="platform">新 平 台 單</button>
+      <button class="tab" data-tab="vendor">新 廠 商 單</button>
       <button class="tab" data-tab="history">歷 史</button>
     
     </div>
@@ -1710,12 +1710,28 @@ function doneOf(orderId) {
     .reduce((s, p) => s + (Number(p['完成數量']) || 0), 0);
 }
 function itemMatchStr(it) {
-  return `${safeText(it['品項'])} ${safeText(it['款式'])} ${safeText(it['大小'])}`.trim();
+  const 品項 = safeText(it['品項']);
+  const 大小 = safeText(it['大小']);
+  const 顏色 = safeText(it['顏色']);
+  const 款式 = safeText(it['款式']);
+  // 新格式：品項【大小】顏色 款式
+  const newFmt = `${品項}【${大小}】 ${顏色} ${款式}`.trim();
+  // 舊格式：品項 款式 大小（向下相容舊紀錄）
+  const oldFmt = `${品項} ${款式} ${大小}`.trim();
+  return newFmt;
 }
 function itemDoneCount(orderId, it) {
-  const m = itemMatchStr(it);
+  const 品項 = safeText(it['品項']);
+  const 大小 = safeText(it['大小']);
+  const 顏色 = safeText(it['顏色']);
+  const 款式 = safeText(it['款式']);
+  const newFmt = `${品項}【${大小}】 ${顏色} ${款式}`.trim();
+  const oldFmt = `${品項} ${款式} ${大小}`.trim();
   return progressOf(orderId)
-    .filter(p => safeText(p['備註']) === m)
+    .filter(p => {
+      const note = safeText(p['備註']);
+      return note === newFmt || note === oldFmt;
+    })
     .reduce((s, p) => s + (Number(p['完成數量']) || 0), 0);
 }
 function isOrderDone(o) {
