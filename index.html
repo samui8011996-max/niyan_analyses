@@ -793,54 +793,8 @@ z-index: 10;
     margin-bottom: 4px;
     letter-spacing: 1px;
   }
-  .vc-spec {
-    display: flex; flex-wrap: wrap; gap: 4px 8px;
-    font-size: 13px;
-    color: var(--ink-soft);
-    margin-bottom: 6px;
-    align-items: center;
-  }
-  .vc-spec .color-tag {
-    display: inline-flex; align-items: center; gap: 4px;
-  }
-  .vc-spec .swatch {
-    width: 12px; height: 12px;
-    border-radius: 50%;
-    border: 1px solid rgba(0,0,0,0.15);
-    display: inline-block;
-  }
-  .vc-qty {
-    font-family: 'Shippori Mincho', serif;
-    font-size: 24px;
-    font-weight: 700;
-    letter-spacing: 2px;
-    margin: 6px 0 4px;
-  }
-  .vc-qty .done-num { color: var(--stamp-blue); }
-  .vc-qty .slash { color: var(--line-dark); margin: 0 4px; }
-  .vc-progress-bar {
-    height: 4px;
-    background: var(--paper-2);
-    border-radius: 2px;
-    overflow: hidden;
-    margin-bottom: 8px;
-  }
-  .vc-progress-bar > div {
-    height: 100%;
-    background: var(--stamp-blue);
-    transition: width 0.3s;
-  }
-  .vc-progress-bar.complete > div { background: var(--stamp-red); }
- .vc-pack {
-  font-family: 'Noto Sans TC', 'Klee One', serif;
-  font-size: 12px;
-  color: var(--ink-soft);
-  background: var(--paper-2);
-  padding: 5px 8px;
-  border-radius: 6px;
-  margin: 4px 0;
-  border-left: 2px solid var(--accent-soft);
-}
+
+
 .vc-note {
   font-family: 'Noto Sans TC', 'Klee One', serif;
   font-size: 13px;
@@ -1243,6 +1197,16 @@ z-index: 10;
   .pf-inputs { grid-template-columns: 1fr; }
   .pf-inputs .pf-num-btn { flex: 0 1 auto; padding: 4px 14px; }
   .pf-inputs input { max-width: 100%; }
+  /* 手機：字體 16px 防止 iOS 點下拉時自動放大跳動 */
+  input[type="text"], input[type="number"], input[type="date"],
+  input[type="search"], input[type="tel"], input[type="email"],
+  select, textarea { font-size: 16px; }
+
+  /* 下拉加高，點擊區更好按 */
+  select { min-height: 46px; padding-top: 11px; padding-bottom: 11px; }
+
+  /* 廠商單改單欄，下拉框滿版最寬 */
+  #sec-vendor .form-grid { grid-template-columns: 1fr; }
 }
 .corner-settings {
   position: absolute;
@@ -1400,17 +1364,25 @@ z-index: 10;
       ＋ 新 增 品 項
     </button>
 
-    <!-- 整張單備註 -->
+<!-- 整張單備註 -->
     <div class="field full" style="margin-top:20px;">
       <label>備 註</label>
       <textarea id="f_note" placeholder="任何補充說明…"></textarea>
+    </div>
+
+  <div class="qty-check-row" style="margin-top:16px;">
+      <input type="checkbox" id="f_all_done">
+      <label for="f_all_done">送出後直接標記為完成訂單（所有品項視為已完成）</label>
+    </div>
+    <div class="field" id="f_done_staff_wrap" style="display:none;margin-top:10px;max-width:220px;">
+      <label>出 貨 人 員</label>
+      <select id="f_done_staff"><option value="">—</option></select>
     </div>
 
     <div class="btn-row">
       <button class="btn ghost" id="btnReset">清 空</button>
       <button class="btn primary" id="btnSubmit">送 出</button>
     </div>
-  </div>
 </section>
 
 
@@ -1489,9 +1461,10 @@ z-index: 10;
           <div>
             <button class="btn small" id="cfgSave">儲 存</button>
             <button class="btn small ghost" id="cfgTest">測 試 連 線</button>
+            <button class="btn small ghost" id="cfgClear">清 除</button>
           </div>
           <div class="status" id="cfgStatus"></div>
-          <p style="margin-top: 20px; font-size: 12px;">資料每 20 秒自動同步；新增/修改後立即同步。</p>
+          <p style="margin-top: 20px; font-size: 12px;">資料每 10 秒自動同步；新增/修改後立即同步。</p>
           <p style="margin-top: 10px; font-size: 12px;">隱藏的卡片可在歷史紀錄中查看與恢復。</p>
         </div>
       </div>
@@ -1698,10 +1671,13 @@ async function api(action, payload = {}) {
   return data.data;
 }
 
+let loadSeq = 0;
 async function loadAll() {
   if (!API_URL) return;
+  const mySeq = ++loadSeq;
   try {
     const main = await api('readAll');
+    if (mySeq !== loadSeq) return;   // 已有更新的請求送出，丟棄這個過期結果
     state.orders    = main.orders    || [];
     state.progress  = main.progress  || [];
     state.platforms = main.platforms || [];
@@ -1721,17 +1697,7 @@ function doneOf(orderId) {
   return state.progress.filter(p => p['訂單id'] === orderId)
     .reduce((s, p) => s + (Number(p['完成數量']) || 0), 0);
 }
-function itemMatchStr(it) {
-  const 品項 = safeText(it['品項']);
-  const 大小 = safeText(it['大小']);
-  const 顏色 = safeText(it['顏色']);
-  const 款式 = safeText(it['款式']);
-  // 新格式：品項【大小】顏色 款式
-  const newFmt = `${品項}【${大小}】 ${顏色} ${款式}`.trim();
-  // 舊格式：品項 款式 大小（向下相容舊紀錄）
-  const oldFmt = `${品項} ${款式} ${大小}`.trim();
-  return newFmt;
-}
+
 function itemDoneCount(orderId, it) {
   const 品項 = safeText(it['品項']);
   const 大小 = safeText(it['大小']);
@@ -2002,7 +1968,6 @@ const itColors = String(it['顏色'] || '').split(/[、,，]/).map(c => c.trim()
             ${o['交期'] ? `<span class="due">／ 交期 ${fmtDate(o['交期'])}</span>` : ''}
           </div>
           ${safeText(o['廠商']) ? `<div class="vc-vendor">${escapeHtml(safeText(o['廠商']))}</div>` : ''}
-          ${!itList ? `<div class="vc-item">${escapeHtml(safeText(o['品項']) || '（未指定）')}</div>` : ''}
           ${itemsHtml}
           ${orderNo ? `<div class="vc-note" style="color:var(--stamp-blue);font-size:12px;">🔖 ${escapeHtml(orderNo)}</div>` : ''}
           ${note ? `<div class="vc-note">${escapeHtml(note)}</div>` : ''}
@@ -2611,32 +2576,77 @@ function resetVendorForm() {
   $('#f_due').value      = '';
   $('#f_vendor').value   = '';
   $('#f_order_no').value = '';
-  $('#f_note').value     = '';
+$('#f_note').value     = '';
+  const allDoneChk = $('#f_all_done');
+  if (allDoneChk) allDoneChk.checked = false;
+  const doneStaffWrap = $('#f_done_staff_wrap');
+  if (doneStaffWrap) doneStaffWrap.style.display = 'none';
+  const doneStaffSel = $('#f_done_staff');
+  if (doneStaffSel) doneStaffSel.value = '';
   itemCounter = 0;
   const list = $('#f_items_list');
   list.innerHTML = '';
   list.appendChild(createItemRow());
 }
 
+function refreshItemRowOptions(div) {
+  const s = state.settings || {};
+  [['.fi-item', DEFAULT_ITEMS, s['品項']],
+   ['.fi-style', DEFAULT_STYLES, s['款式']],
+   ['.fi-size', DEFAULT_SIZES, s['大小']]].forEach(([sel, defaults, custom]) => {
+    const el = div.querySelector(sel);
+    if (!el) return;
+    const cur = el.value;
+    el.innerHTML = '<option value="">—</option>' +
+      mergeList(defaults, custom).map(v => `<option ${v===cur?'selected':''}>${escapeHtml(v)}</option>`).join('');
+  });
+  const colorWrap = div.querySelector('.fi-colors');
+  if (colorWrap) {
+    const selected = colorWrap.querySelector('.color-chip.on')?.dataset.color || '';
+    colorWrap.innerHTML = mergeList(DEFAULT_COLORS, s['顏色']).map(c => `
+      <div class="color-chip ${selected===c?'on':''}" data-color="${escapeAttr(c)}">
+        <span class="swatch" style="background:${colorOf(c)}"></span>
+        <span>${escapeHtml(c)}</span>
+      </div>`).join('') + '<button type="button" class="color-add" data-add="顏色">+ 新增</button>';
+    colorWrap.querySelectorAll('.color-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const wasOn = chip.classList.contains('on');
+        colorWrap.querySelectorAll('.color-chip').forEach(c => c.classList.remove('on'));
+        if (!wasOn) chip.classList.add('on');
+      });
+    });
+    colorWrap.querySelector('.color-add')?.addEventListener('click', () => { window._addTargetRow = div; openAddModal('顏色'); });
+  }
+}
+
 function renderSelects() {
   const s = state.settings || {};
+  // 使用者正在填廠商單時跳過自動重建，避免打斷輸入或關掉下拉
+  const vsec = $('#sec-vendor');
+  if (vsec && vsec.contains(document.activeElement)) return;
   fillSelect($('#f_vendor'), mergeList(DEFAULT_VENDORS, s['廠商']));
+  document.querySelectorAll('#f_items_list .item-row').forEach(refreshItemRowOptions);
 }
 
 async function submitVendor() {
   if (!API_URL) { toast('請先設定 API 網址', true); return; }
   if (!$('#f_date').value) { toast('請選日期', true); return; }
-  const items = collectItems();
+const items = collectItems();
   if (!items.some(it => it['品項'])) {
     toast('請至少填一個品項', true); return;
+  }
+  const allDone   = $('#f_all_done').checked;
+  const doneStaff = $('#f_done_staff') ? $('#f_done_staff').value : '';
+  if (allDone && !doneStaff) {
+    toast('請選擇出貨人員', true); return;
   }
   const btn = $('#btnSubmit');
   btn.disabled = true;
   const orig = btn.textContent;
   btn.textContent = '送 出 中…';
-  try {
+try {
   const firstItem = items[0] || {};
-await api('addOrder', {
+const res = await api('addOrder', {
   '下單日期':  $('#f_date').value,
   '交期':      $('#f_due').value,
   '廠商':      $('#f_vendor').value,
@@ -2650,7 +2660,27 @@ await api('addOrder', {
   '備註':      $('#f_note').value,
   'items':     items
 });
-    toast('送出成功');
+
+    const allDone = $('#f_all_done').checked;
+if (res && res.id && allDone) {
+      const today = todayStr();
+      for (const it of items) {
+        if (!it['品項']) continue;
+        const q = Number(it['數量']) || 0;
+        if (q <= 0) continue;
+        await api('addProgress', {
+          '訂單id':   res.id,
+          '完成日期': today,
+          '完成數量': q,
+          '總箱數':   '',
+          '物流公司': '黑貓',
+          '包貨人員': doneStaff,
+          '備註': `${safeText(it['品項'])}【${safeText(it['大小'])}】 ${safeText(it['顏色'])} ${safeText(it['款式'])}`.trim()
+        });
+      }
+    }
+
+    toast(allDone ? '已送出並標記完成' : '送出成功');
     resetVendorForm();
     await loadAll();
     switchTab('board');
@@ -2666,7 +2696,24 @@ $('#btnSubmit').addEventListener('click', submitVendor);
 $('#btnReset').addEventListener('click', resetVendorForm);
 $('#btnAddItem').addEventListener('click', () => {
   $('#f_items_list').appendChild(createItemRow());
+  div.querySelector('.color-add').addEventListener('click', () => { window._addTargetRow = div; openAddModal('顏色'); });
+    // 下拉新增按鈕
+  div.querySelectorAll('.add-btn[data-add]').forEach(b => {
+    b.addEventListener('click', e => { e.preventDefault(); window._addTargetRow = div; openAddModal(b.dataset.add); });
+  });
 });
+
+
+// 建單完成：人員下拉填充 + 勾選才顯示
+(function(){
+  const sel = document.getElementById('f_done_staff');
+  if (sel) sel.innerHTML = '<option value="">—</option>' + STAFFS.map(s => `<option>${s}</option>`).join('');
+  const chk = document.getElementById('f_all_done');
+  const wrap = document.getElementById('f_done_staff_wrap');
+  if (chk && wrap) {
+    chk.addEventListener('change', () => { wrap.style.display = chk.checked ? 'block' : 'none'; });
+  }
+})();
 /* ============ 新增選項 ============ */
 let addCategory = '';
 function openAddModal(cat) {
@@ -2743,10 +2790,17 @@ $('#amSave').addEventListener('click', async () => {
       localStorage.setItem(LS_COLORS, JSON.stringify(colorMap));
     }
     renderSelects();
-  
-    const map = { '廠商':'#f_vendor', '品項':'#f_item', '款式':'#f_style', '大小':'#f_size' };
-    const sel = map[addCategory];
-    if (sel) $(sel).value = val;
+    const target = window._addTargetRow;
+    if (target) {
+      if (addCategory === '品項') { const el = target.querySelector('.fi-item'); if (el) el.value = val; }
+      else if (addCategory === '款式') { const el = target.querySelector('.fi-style'); if (el) el.value = val; }
+      else if (addCategory === '大小') { const el = target.querySelector('.fi-size'); if (el) el.value = val; }
+      else if (addCategory === '顏色') {
+        target.querySelectorAll('.color-chip').forEach(c => c.classList.toggle('on', c.dataset.color === val));
+      }
+      window._addTargetRow = null;
+    }
+    if (addCategory === '廠商') $('#f_vendor').value = val;
     $('#addModal').classList.remove('show');
     toast('已新增');
   } catch (e) { toast(e.message, true); }
@@ -2906,9 +2960,9 @@ if (safeText(p['備註'])) {
   }
 
   // 刪除訂單移到左邊
-  html += `
+html += `
     <div class="btn-row split">
-      <button class="btn small danger" id="orderDel">刪除訂單</button>
+      <button class="btn small ghost" id="orderClose">關閉</button>
       <button class="btn small ghost"  id="orderEdit">編輯</button>
     </div>
   `;
@@ -3000,13 +3054,7 @@ const chk = $('#checkAll'), pQty = $('#pQty');
     });
   });
 
-  $('#orderDel').addEventListener('click', async () => {
-    if (!confirm('確定刪除此訂單？相關完成紀錄也會一併刪除。')) return;
-    try {
-      await api('deleteOrder', { id: o.id });
-      closeOrderModal(); await loadAll(); toast('已刪除');
-    } catch (e) { toast(e.message, true); }
-  });
+$('#orderClose').addEventListener('click', () => closeOrderModal());
 
   $('#orderEdit').addEventListener('click', () => openOrderEdit(o));
 }
@@ -3126,25 +3174,12 @@ function openOrderEdit(o) {
         <textarea id="e_note">${escapeHtml(safeText(o['備註']))}</textarea>
       </div>
     </div>
-    <div class="btn-row split">
-      <button class="btn small danger" id="eDel">刪除</button>
-      <div style="display:flex;gap:10px;">
-        <button class="btn small ghost" id="eBack">返回</button>
-        <button class="btn small primary" id="eSave">儲 存</button>
-      </div>
+<div class="btn-row split">
+      <button class="btn small ghost" data-close>關閉</button>
+      <button class="btn small primary" id="efSave">儲存</button>
     </div>
   `;
-  $('#eBack').addEventListener('click', () => renderOrderModal());
-  $('#eDel').addEventListener('click', async () => {
-    if (!confirm('確定刪除此訂單？相關完成紀錄也會一併刪除。')) return;
-    try {
-      await api('deleteOrder', { id: o.id });
-      closeOrderModal();
-      await loadAll();
-      toast('已刪除');
-    } catch (e) { toast(e.message, true); }
-  });
-$('#eSave').addEventListener('click', async () => {
+$('#efSave').addEventListener('click', async () => {
     const saveBtn = $('#eSave');
     const allBtns = $('#omBody').querySelectorAll('button, input, select, textarea');
     saveBtn.disabled = true;
@@ -3245,13 +3280,11 @@ const numButtons = `
     <div class="pf-form-head">
       <span class="pf-name" style="color:var(--ink-soft);font-size:14px;">＋ 新增平台</span>
     </div>
-    <div style="display:flex;gap:8px;align-items:flex-end;">
-      <div class="field" style="flex:1;">
-        <label>平 台 名 稱</label>
-        <input type="text" id="inline_pm_name" placeholder="例：露天、MOMO…">
-      </div>
-      <button type="button" class="btn primary" id="inline_pm_add" style="padding:8px 18px;white-space:nowrap;">新 增</button>
+<div class="field">
+      <label>平 台 名 稱</label>
+      <input type="text" id="inline_pm_name" placeholder="輸入平台名稱">
     </div>
+    <button type="button" class="btn primary" id="inline_pm_add" style="width:100%;margin-top:10px;">新 增</button>
   </div>
   </div>`;
 
@@ -3470,12 +3503,9 @@ function openPlatformEdit(rec, platformName, overrideDate) {
   $('#pfmBody').innerHTML = `
     <div class="form-grid">${detailHtml}</div>
     <div class="field" style="margin-top:12px;"><label>備註</label><textarea id="ef_note">${escapeHtml(isNew ? '' : safeText(rec['備註']))}</textarea></div>
-    <div class="btn-row split">
-      ${isNew ? '<span></span>' : '<button class="btn small danger" id="efDel">刪除</button>'}
-      <div style="display:flex;gap:10px;">
-        <button class="btn small ghost"  data-close>取消</button>
-        <button class="btn small primary" id="efSave">儲存</button>
-      </div>
+<div class="btn-row split">
+      <button class="btn small ghost" data-close>關閉</button>
+      <button class="btn small primary" id="efSave">儲存</button>
     </div>
   `;
   $('#pfModal').classList.add('show');
@@ -3514,17 +3544,7 @@ function openPlatformEdit(rec, platformName, overrideDate) {
     } catch (e) { toast(e.message, true); }
   });
 
-  if (!isNew) {
-    $('#efDel').addEventListener('click', async () => {
-      if (!confirm('確定刪除？')) return;
-      try {
-        await api('deletePlatform', { id: rec.id });
-        $('#pfModal').classList.remove('show');
-        await loadAll();
-        toast('已刪除');
-      } catch (e) { toast(e.message, true); }
-    });
-  }
+
 }
 
 /* ============ 分頁切換 ============ */
@@ -3582,10 +3602,9 @@ document.addEventListener('click', e => {
 
 /* ============ 設定 ============ */
 $('#cfgUrl').value = API_URL;
-$('#cfgSave').addEventListener('click', () => {
-  API_URL = $('#cfgUrl').value.trim();
-  localStorage.setItem(LS_URL, API_URL);
-  toast('已儲存'); loadAll();
+$('#cfgClear').addEventListener('click', () => {
+  $('#cfgUrl').value = '';
+  $('#cfgUrl').focus();
 });
 $('#cfgTest').addEventListener('click', async () => {
   const s = $('#cfgStatus');
