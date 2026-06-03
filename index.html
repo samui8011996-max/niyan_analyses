@@ -466,6 +466,17 @@ html, body {
     border-left-color: var(--tape-blue);
     background: #fefcf5;
   }
+
+.pf-form-card[data-platform="未出貨"],
+.pf-form-card[data-platform="未出貨"].has-data {
+  border-left-color: var(--stamp-red);
+}
+
+.pf-form-card[data-platform="補寄"],
+.pf-form-card[data-platform="補寄"].has-data {
+  border-left-color: var(--pf-info, #a7b8ab);
+}
+
   .pf-form-head {
     display: flex; align-items: center; gap: 10px;
     margin-bottom: 8px;
@@ -1188,6 +1199,35 @@ z-index: 10;
     font-family: 'Caveat', cursive;
     font-size: 18px;
   }
+.logi-summary {
+  display: flex; flex-wrap: wrap; gap: 10px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  background: var(--paper-2);
+  border-radius: 8px;
+  border: 1.5px dashed var(--line-dark);
+}
+.logi-chip {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 14px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+}
+.logi-chip .logi-name {
+  font-family: 'Shippori Mincho', serif;
+  font-size: 14px; letter-spacing: 2px; color: var(--ink-soft);
+}
+.logi-chip .logi-num {
+  font-family: 'Shippori Mincho', serif;
+  font-size: 22px; font-weight: 700; color: var(--ink);
+  min-width: 22px; text-align: center;
+}
+.logi-chip.logi-blackcat { background: var(--ink); border-color: var(--ink); }
+.logi-chip.logi-blackcat .logi-name { color: var(--paper-2); }
+.logi-chip.logi-blackcat .logi-num { color: #fff; }
+.logi-chip.logi-cvs { background: var(--tape-blue); border-color: #8fb3c4; }
+.logi-chip.logi-cvs .logi-name { color: var(--ink); }
 @media (max-width: 600px) {
   .banner h1 { font-size: 26px; letter-spacing: 4px; }
   .tab { padding: 6px 12px; font-size: 12px; }
@@ -1260,13 +1300,25 @@ z-index: 10;
 
     <!-- 公告 -->
     <section class="section active" id="sec-board">
+ <div class="card" id="unsentCard" style="display:none;">
+        <span class="tape t-pink">pending ✦ 未 出 貨</span>
+        <div class="card-title">
+          <span class="dot"></span>
+          <span>未 出 貨</span>
+        </div>
+        <div class="pf-grid" id="unsentList"></div>
+      </div>
+
+
       <div class="card">
         <span class="tape t-cream">today ✦ 今 日 平 台 單</span>
         <div class="card-title">
           <span class="dot"></span>
           <span>今 日 物 流 平 台</span>
-          <span style="margin-left:auto;font-size:12px;color:var(--ink-soft);" id="todayDateLabel"></span>
+        <span style="margin-left:auto;font-size:12px;color:var(--ink-soft);" id="todayDateLabel"></span>
         </div>
+
+        <div id="todayLogiSummary"></div>
 
         <div class="bulk-bar" id="pfBulkBar" style="display:none;">
           <span class="bulk-text">尚有 <b id="pfUndoneCount">0</b> 個平台未完成（不含已備註原因者）</span>
@@ -1277,8 +1329,10 @@ z-index: 10;
         <div class="hide-toggle" id="pfHiddenToggle"></div>
       </div>
 
+     
+
       <div class="card">
-        <span class="tape">vendor ✦ 廠 商 訂 購 單</span>
+        <span class="tape t-yellow">vendor ✦ 廠 商 訂 購 單</span>
         <div class="card-title">
           <span class="dot"></span>
           <span>廠 商 訂 單</span>
@@ -1302,17 +1356,14 @@ z-index: 10;
 <section class="section" id="sec-platform">
   <div class="card">
    <span class="tape t-blue">platform ✦ 新 平 台 單</span>
-    <div class="form-grid" style="margin-bottom:16px;">
+
       <div class="field">
         <label>日 期</label>
         <input type="date" id="p_date">
       </div>
-<div class="field full">
-        <label>全域備註（選填）</label>
-        <input type="text" id="p_global_note" placeholder="適用所有平台的備註…">
-      </div>
 
-    </div>
+   
+    
     </div>
     <div id="p_all_platforms"></div>
     <div class="btn-row">
@@ -1320,6 +1371,8 @@ z-index: 10;
       <button class="btn primary" id="pSubmit">送 出</button>
     </div>
   </div>
+
+  
 </section>
     <!-- 新廠商單 -->
 <section class="section" id="sec-vendor">
@@ -1405,7 +1458,8 @@ z-index: 10;
           <select id="hisPlatform">
             <option value="">全部</option>
             <option>Line禮物</option><option>蝦皮</option><option>Pinkoi</option>
-            <option>瑪黑</option><option>官網</option><option>博客來</option><option>酷澎</option>
+            <option>瑪黑</option><option>官網</option><option>博客來</option><option>MO+</option><option>酷澎</option>
+            <option>補寄</option><option>未出貨</option>
           </select>
           <label>狀態</label>
           <select id="hisPStatus">
@@ -1464,7 +1518,7 @@ z-index: 10;
             <button class="btn small ghost" id="cfgClear">清 除</button>
           </div>
           <div class="status" id="cfgStatus"></div>
-          <p style="margin-top: 20px; font-size: 12px;">資料每 10 秒自動同步；新增/修改後立即同步。</p>
+          <p style="margin-top: 20px; font-size: 12px;">資料每 20 秒自動同步；新增/修改後立即同步。</p>
           <p style="margin-top: 10px; font-size: 12px;">隱藏的卡片可在歷史紀錄中查看與恢復。</p>
         </div>
       </div>
@@ -1570,11 +1624,18 @@ const DEFAULT_PLATFORM_LOGISTICS = {
   '官網':     ['黑貓','超商'],
   '博客來':   ['黑貓'],
   'MO+':      ['黑貓','超商'],
-  '酷澎':     []
+  '酷澎':     [],
+  '補寄':     ['黑貓','超商'],
+  '未出貨':   ['黑貓','超商']
 };
 
-const DEFAULT_PLATFORM_ORDER = ['Line禮物','蝦皮','Pinkoi','瑪黑','官網','博客來','MO+','酷澎'];
+const DEFAULT_PLATFORM_ORDER = ['Line禮物','蝦皮','Pinkoi','瑪黑','官網','博客來','MO+','酷澎','補寄','未出貨'];
 
+// 未出貨在「今日平台」一般卡片清單中特殊處理，不走一般迴圈
+const SPECIAL_PLATFORMS = ['未出貨'];
+function getBoardPlatformOrder() {
+  return getPlatformOrder().filter(n => !SPECIAL_PLATFORMS.includes(n));
+}
 
 
 // 動態（從 localStorage 讀取自訂平台）
@@ -1697,7 +1758,125 @@ function doneOf(orderId) {
   return state.progress.filter(p => p['訂單id'] === orderId)
     .reduce((s, p) => s + (Number(p['完成數量']) || 0), 0);
 }
+/* 計算今日物流總數 */
+function computeTodayLogi() {
+  const today = todayStr();
+  let blackcat = 0, cvs = 0;
+  const others = {};
+  // 今日所有平台（未出貨不在此累計，改用扣除）
+  state.platforms.filter(p => fmtDate(p['日期']) === today && p['平台'] !== '未出貨').forEach(p => {
+    (Array.isArray(p['明細']) ? p['明細'] : []).forEach(d => {
+      const logi = String(d.物流 || '').trim();
+      const qty  = Number(d.件數) || 0;
+      if (!qty) return;
+      if (logi === '黑貓')             blackcat += qty;  // 含補寄黑貓；「蝦皮黑貓」名稱不等於「黑貓」故不計入
+      else if (logi.includes('超商'))  cvs += qty;       // 含蝦皮超商
+      else (others[logi] = (others[logi] || 0) + qty);   // 蝦皮一般、蝦皮黑貓、蝦皮隔日… 各自獨立
+    });
+  });
+  // 未出貨：建立日=今天且「未完成」→ 從今日扣除。
+  // 完成後不再扣（那幾件本來就算在今日平台數字裡，等於放回去）。
+  state.platforms.filter(p =>
+    p['平台'] === '未出貨' &&
+    fmtDate(p['日期']) === today &&
+    !isDone(p['已完成'])
+  ).forEach(p => {
+    (Array.isArray(p['明細']) ? p['明細'] : []).forEach(d => {
+      const logi = String(d.物流 || '').trim();
+      const qty  = Number(d.件數) || 0;
+      if (logi === '黑貓')             blackcat -= qty;
+      else if (logi.includes('超商'))  cvs -= qty;
+    });
+  });
+  return { blackcat, cvs, others };
+}
 
+/* 今日物流總數摘要 */
+function renderTodayLogiSummary() {
+  const el = $('#todayLogiSummary');
+  if (!el) return;
+  const { blackcat, cvs, others } = computeTodayLogi();
+  const otherKeys = Object.keys(others).filter(k => others[k] > 0).sort();
+  let chips = `
+    <div class="logi-chip logi-blackcat"><span class="logi-name">黑貓</span><span class="logi-num">${blackcat}</span></div>
+    <div class="logi-chip logi-cvs"><span class="logi-name">超商</span><span class="logi-num">${cvs}</span></div>
+  `;
+  otherKeys.forEach(k => {
+    chips += `<div class="logi-chip"><span class="logi-name">${escapeHtml(k)}</span><span class="logi-num">${others[k]}</span></div>`;
+  });
+  el.innerHTML = `<div class="logi-summary">${chips}</div>`;
+}
+
+/* 未出貨卡片：不分天，未完成才顯示 */
+function renderUnsentBoard() {
+  const card = $('#unsentCard');
+  const list = $('#unsentList');
+  if (!card || !list) return;
+  const today = todayStr();
+  const unsent = state.platforms
+    .filter(p => {
+      if (p['平台'] !== '未出貨') return false;
+      // 未完成 → 一直顯示
+      if (!isDone(p['已完成'])) return true;
+      // 已完成 → 只在「完成日=今天」顯示，隔天消失
+      return fmtDate(p['完成日期']) === today;
+    })
+    .sort((a,b) => (a['日期']||'').localeCompare(b['日期']||''));
+
+  if (!unsent.length) { card.style.display = 'none'; list.innerHTML = ''; return; }
+  card.style.display = '';
+
+  list.innerHTML = unsent.map(rec => {
+    const detail = Array.isArray(rec['明細']) ? rec['明細'] : [];
+    const detailHtml = detail.filter(d => Number(d.件數) > 0).map(d =>
+      `<div class="pf-line"><span>${escapeHtml(d.物流||'件數')}</span><b>${d.件數||0}</b></div>`
+    ).join('') || '<div style="text-align:center;padding:4px 0;font-size:12px;">無件數</div>';
+    const note = safeText(rec['備註']);
+    const done = isDone(rec['已完成']);
+    return `
+       <div class="pf-card ${done ? 'done' : ''}" data-unsent-id="${rec.id}" style="border-left:4px solid var(--stamp-red);cursor:pointer;">
+        <div class="pf-platform"><span>未出貨</span>
+          <span class="pf-tag" style="background:var(--accent);">${fmtDate(rec['日期'])||''}</span>
+        </div>
+        <div class="pf-details">${detailHtml}</div>
+        ${note ? `<div style="font-family:'Noto Sans TC','Klee One',serif;font-size:12px;color:var(--stamp-red);border-top:1px dotted var(--line);padding-top:6px;margin-bottom:6px;">📝 ${escapeHtml(note)}</div>` : ''}
+        <div class="pf-actions">
+          ${done
+            ? `<button class="btn small ghost" data-unsent-undone="${rec.id}">取消完成</button>`
+            : `<button class="btn small primary" data-unsent-done="${rec.id}">已出貨完成 ✓</button>`}
+          <button class="btn small ghost" data-unsent-del="${rec.id}">刪除</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  list.querySelectorAll('[data-unsent-done]').forEach(b => {
+    b.addEventListener('click', async () => {
+      try {
+        await api('updatePlatform', { id: b.dataset.unsentDone, '已完成': true, '完成日期': todayStr() });
+        toast('已標記出貨完成');
+        await loadAll();
+      } catch (err) { toast(err.message, true); }
+    });
+  });
+  list.querySelectorAll('[data-unsent-del]').forEach(b => {
+    b.addEventListener('click', async () => {
+      if (!confirm('確定刪除此未出貨紀錄？')) return;
+      try {
+        await api('deletePlatform', { id: b.dataset.unsentDel });
+        toast('已刪除');
+        await loadAll();
+      } catch (err) { toast(err.message, true); }
+    });
+  });
+  // 點卡片本身 → 編輯（避開按鈕）
+  list.querySelectorAll('[data-unsent-id]').forEach(card => {
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('button')) return;   // 點到完成/刪除不觸發編輯
+      const rec = state.platforms.find(x => x.id === card.dataset.unsentId);
+      if (rec) openPlatformEdit(rec);
+    });
+  });
+}
 function itemDoneCount(orderId, it) {
   const 品項 = safeText(it['品項']);
   const 大小 = safeText(it['大小']);
@@ -1737,13 +1916,16 @@ function renderPlatformBoard() {
   const list = $('#pfList');
   const today = todayStr();
 
-  const todayItems = state.platforms.filter(p => fmtDate(p['日期']) === today);
+  renderTodayLogiSummary();
+  renderUnsentBoard();
+
+  const todayItems = state.platforms.filter(p => fmtDate(p['日期']) === today && p['平台'] !== '未出貨');
   const byPlatform = {};
   todayItems.forEach(p => { byPlatform[p['平台']] = p; });
 
   // 計算未完成且無備註者（可以一鍵完成的）
   let undoneCanBulk = 0;
-  getPlatformOrder().forEach(name => {
+  getBoardPlatformOrder().forEach(name => {
     const rec = byPlatform[name];
     if (rec && !isDone(rec['已完成'])) {
       const note = safeText(rec['備註']);
@@ -1758,11 +1940,21 @@ function renderPlatformBoard() {
     bulkBar.style.display = 'none';
   }
 
-  const visibleNames = getPlatformOrder().filter(n => {
-    if (!hiddenPf.has(n + '|' + today)) return true;
-    return false;
+  let visibleNames = getBoardPlatformOrder().filter(n => !hiddenPf.has(n + '|' + today));
+  const hiddenCount = getBoardPlatformOrder().length - visibleNames.length;
+
+  // 排序：未完成有資料 → 未填寫 → 已完成；同組維持原順序
+  const baseOrder = getBoardPlatformOrder();
+  const rankOf = (name) => {
+    const rec = byPlatform[name];
+    if (!rec) return 1;                       // 未填寫
+    return isDone(rec['已完成']) ? 2 : 0;     // 已完成=2、未完成有資料=0
+  };
+  visibleNames = visibleNames.slice().sort((a, b) => {
+    const ra = rankOf(a), rb = rankOf(b);
+    if (ra !== rb) return ra - rb;
+    return baseOrder.indexOf(a) - baseOrder.indexOf(b);
   });
-  const hiddenCount = getPlatformOrder().length - visibleNames.length;
 
   if (visibleNames.length === 0) {
     list.innerHTML = '<div class="empty" style="grid-column:1/-1;">所有平台已隱藏</div>';
@@ -1815,8 +2007,8 @@ ${isDone(rec['已完成'])
   const toggle = $('#pfHiddenToggle');
   if (hiddenCount > 0) {
     toggle.innerHTML = `<button id="pfShowHidden">顯示已隱藏的 ${hiddenCount} 個</button>`;
-    $('#pfShowHidden').addEventListener('click', () => {
-      getPlatformOrder().forEach(n => hiddenPf.delete(n + '|' + today));
+   $('#pfShowHidden').addEventListener('click', () => {
+      getBoardPlatformOrder().forEach(n => hiddenPf.delete(n + '|' + today));
       saveHidden();
       renderPlatformBoard();
     });
@@ -1868,6 +2060,7 @@ $('#pfBulkDone').addEventListener('click', async () => {
   const today = todayStr();
 const targets = state.platforms.filter(p =>
   fmtDate(p['日期']) === today &&
+  p['平台'] !== '未出貨' &&
   !isDone(p['已完成']) &&
   !safeText(p['備註'])
 );
@@ -1999,6 +2192,7 @@ const itColors = String(it['顏色'] || '').split(/[、,，]/).map(c => c.trim()
   list.querySelectorAll('.vendor-card').forEach(c => {
     c.addEventListener('click', () => openOrderModal(c.dataset.id));
   });
+  
 }
 
 /* ----- 歷史：廠商單（深色條列） ----- */
@@ -3214,8 +3408,15 @@ $('#efSave').addEventListener('click', async () => {
 /* ============ 平台單表單 ============ */
 function renderPlatformForm(force) {
   const area      = $('#p_all_platforms');
-  // 打字時跳過自動重建；force=true 時強制重建（新增/刪除平台用）
-  if (!force && area && area.contains(document.activeElement)) return;
+  // force=true 一律重建（手動清空/新增刪除平台用）
+  if (!force && area) {
+    // ① 焦點在表單內 → 跳過
+    if (area.contains(document.activeElement)) return;
+    // ② 表單裡有任何件數或備註已填 → 跳過，避免自動同步清掉正在填的資料
+    const hasInput = Array.from(area.querySelectorAll('.pf-input, .pf-note-input'))
+      .some(el => el.value && el.value.trim() !== '');
+    if (hasInput) return;
+  }
   const date      = $('#p_date').value || todayStr();
 
   const todayRecs = {};
@@ -3225,7 +3426,8 @@ function renderPlatformForm(force) {
 
   area.innerHTML = '<div class="pf-form">' + getPlatformOrder().map(name => {
     const opts     = getPlatformLogistics()[name] || [];
-    const existing = todayRecs[name];
+    // 未出貨每次送出都新增一筆，故表單永遠空白、不回填
+    const existing = (name === '未出貨') ? null : todayRecs[name];
     const map      = {};
     if (existing && Array.isArray(existing['明細'])) {
       existing['明細'].forEach(d => { map[d.物流] = d.件數 || 0; });
@@ -3266,7 +3468,9 @@ const numButtons = `
       <div class="pf-form-card" data-platform="${escapeAttr(name)}">
 <div class="pf-form-head">
           <span class="pf-name">${name}</span>
+           ${name === '未出貨' ? `<div style="font-size:12px;color:var(--ink-soft);margin-top:6px;letter-spacing:1px;">✦ 每次送出都會新增一筆，可累計多筆</div>` : ''}
           <span class="pf-sum">小計 <b data-sum="${escapeAttr(name)}">0</b></span>
+        
           ${!DEFAULT_PLATFORM_ORDER.includes(name) ? `<button type="button" class="pf-del-platform" data-del-platform="${escapeAttr(name)}" title="刪除平台">×</button>` : ''}
         </div>
         <div class="pf-inputs">${inputs}</div>
@@ -3411,7 +3615,6 @@ function updatePfSum(name) {
 
 function resetPlatformForm() {
   $('#p_date').value        = todayStr();
-  $('#p_global_note').value = '';
   renderPlatformForm();
 }
 
@@ -3422,7 +3625,7 @@ $('#pSubmit').addEventListener('click', async () => {
   if (!API_URL) { toast('請先設定 API 網址', true); return; }
   const date = $('#p_date').value;
   if (!date)  { toast('請選日期', true); return; }
-  const globalNote = $('#p_global_note').value;
+  const globalNote = '';
   const items = [];
 
   getPlatformOrder().forEach(name => {
@@ -3455,8 +3658,11 @@ $('#pSubmit').addEventListener('click', async () => {
   try {
     let added = 0, updated = 0;
     for (const item of items) {
-      const exist = state.platforms.find(p => fmtDate(p['日期']) === date && p['平台'] === item.平台);
       const note  = item.備註 || globalNote;
+      // 未出貨永遠新增（可多筆、跨日保留），其餘平台維持每日覆蓋
+      const exist = item.平台 === '未出貨'
+        ? null
+        : state.platforms.find(p => fmtDate(p['日期']) === date && p['平台'] === item.平台);
       if (exist) {
         await api('updatePlatform', { id: exist.id, '明細': item.明細, '總件數': item.總件數, '備註': note });
         updated++;
@@ -3494,21 +3700,53 @@ function openPlatformEdit(rec, platformName, overrideDate) {
   } else {
     detailHtml = options.map(opt => `
       <div class="field">
-        <label>${opt}${opt==='黑貓'?'':''}</label>
+        <label>${opt}</label>
         <input type="number" class="ef-logi" data-logi="${escapeAttr(opt)}" value="${map[opt]||''}">
       </div>
     `).join('');
   }
 
+  const currentDone = !isNew && isDone(rec['已完成']);
+
   $('#pfmBody').innerHTML = `
     <div class="form-grid">${detailHtml}</div>
     <div class="field" style="margin-top:12px;"><label>備註</label><textarea id="ef_note">${escapeHtml(isNew ? '' : safeText(rec['備註']))}</textarea></div>
-<div class="btn-row split">
+    ${!isNew ? `
+    <div style="margin-top:14px;padding:10px 12px;background:var(--paper-2);border-radius:8px;border-left:3px solid ${currentDone ? '#8aab74' : 'var(--accent)'};display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <span style="font-family:'Klee One',serif;font-size:13px;color:var(--ink-soft);">完成狀態</span>
+      <span style="font-family:'Shippori Mincho',serif;font-size:14px;font-weight:700;color:${currentDone ? '#5b8c5a' : 'var(--stamp-red)'};">${currentDone ? '✓ 已完成' : '○ 未完成'}</span>
+      <button class="btn small ${currentDone ? 'ghost' : 'success'}" id="efToggleDone" style="margin-left:auto;">
+        ${currentDone ? '取消完成' : '標記完成 ✓'}
+      </button>
+    </div>` : ''}
+    <div class="btn-row split">
       <button class="btn small ghost" data-close>關閉</button>
       <button class="btn small primary" id="efSave">儲存</button>
     </div>
   `;
   $('#pfModal').classList.add('show');
+
+  // 標記/取消完成
+  document.getElementById('efToggleDone')?.addEventListener('click', async () => {
+    const btn = document.getElementById('efToggleDone');
+    const willDone = !currentDone;
+    btn.disabled = true;
+    btn.textContent = '處理中…';
+    try {
+      await api('updatePlatform', {
+        id: rec.id,
+        '已完成': willDone,
+        '完成日期': willDone ? todayStr() : ''
+      });
+      $('#pfModal').classList.remove('show');
+      await loadAll();
+      toast(willDone ? '已標記完成' : '已取消完成');
+    } catch (e) {
+      toast(e.message, true);
+      btn.disabled = false;
+      btn.textContent = willDone ? '標記完成 ✓' : '取消完成';
+    }
+  });
 
   $('#efSave').addEventListener('click', async () => {
     let detail = [], total = 0;
@@ -3543,8 +3781,6 @@ function openPlatformEdit(rec, platformName, overrideDate) {
       toast(isNew ? '已新增' : '已儲存');
     } catch (e) { toast(e.message, true); }
   });
-
-
 }
 
 /* ============ 分頁切換 ============ */
