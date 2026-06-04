@@ -715,7 +715,18 @@ z-index: 10;
     padding-top: 8px;
     border-top: 1px dashed var(--line);
   }
-
+/* 未出貨卡片操作列：不換行、按鈕緊湊 */
+#unsentList .pf-actions {
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 5px;
+}
+#unsentList .pf-actions .btn.small {
+  padding: 4px 9px;
+  letter-spacing: 0;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
   /* 一鍵完成全部按鈕區 */
   .bulk-bar {
     display: flex; align-items: center; gap: 10px;
@@ -1774,23 +1785,60 @@ function computeTodayLogi() {
       else (others[logi] = (others[logi] || 0) + qty);   // 蝦皮一般、蝦皮黑貓、蝦皮隔日… 各自獨立
     });
   });
-  // 未出貨：建立日=今天且「未完成」→ 從今日扣除。
-  // 完成後不再扣（那幾件本來就算在今日平台數字裡，等於放回去）。
+  // 未出貨【扣除】：建立日=今天 → 一律從今日扣除（不論完成與否，那幾件當天沒出）
   state.platforms.filter(p =>
     p['平台'] === '未出貨' &&
-    fmtDate(p['日期']) === today &&
-    !isDone(p['已完成'])
+    fmtDate(p['日期']) === today
   ).forEach(p => {
     (Array.isArray(p['明細']) ? p['明細'] : []).forEach(d => {
       const logi = String(d.物流 || '').trim();
       const qty  = Number(d.件數) || 0;
       if (logi === '黑貓')             blackcat -= qty;
       else if (logi.includes('超商'))  cvs -= qty;
+      else                             others[logi] = (others[logi] || 0) - qty;
     });
   });
+
+  // 未出貨【加回】：完成日=今天 → 加到「完成時選擇的物流」（黑貓 / 超商）
+  state.platforms.filter(p =>
+    p['平台'] === '未出貨' &&
+    isDone(p['已完成']) &&
+    fmtDate(p['完成日期']) === today
+  ).forEach(p => {
+    const qty  = Number(p['總件數']) || 0;
+    if (!qty) return;
+    const logi = String(p['完成物流'] || '黑貓').trim();
+    if (logi.includes('超商')) cvs += qty;
+    else                       blackcat += qty;
+  });
+
   return { blackcat, cvs, others };
 }
-
+/* 某平台今天「未出貨且未完成」的扣除量（給今日平台卡片顯示用） */
+function unsentDeductFor(platformName, today) {
+  let total = 0;
+  const byLogi = {};
+  state.platforms.filter(p =>
+    p['平台'] === '未出貨' &&
+    safeText(p['來源平台']) === platformName &&
+    fmtDate(p['日期']) === today &&
+    !isDone(p['已完成'])
+  ).forEach(p => {
+    const detail = Array.isArray(p['明細']) ? p['明細'] : [];
+    if (detail.length) {
+      detail.forEach(d => {
+        const logi = String(d.物流 || '').trim();
+        const qty  = Number(d.件數) || 0;
+        if (!qty) return;
+        total += qty;
+        byLogi[logi] = (byLogi[logi] || 0) + qty;
+      });
+    } else {
+      total += Number(p['總件數']) || 0;
+    }
+  });
+  return { total, byLogi };
+}
 /* 今日物流總數摘要 */
 function renderTodayLogiSummary() {
   const el = $('#todayLogiSummary');
@@ -1835,25 +1883,51 @@ function renderUnsentBoard() {
     const done = isDone(rec['已完成']);
     return `
        <div class="pf-card ${done ? 'done' : ''}" data-unsent-id="${rec.id}" style="border-left:4px solid var(--stamp-red);cursor:pointer;">
-        <div class="pf-platform"><span>未出貨</span>
+        <div class="pf-platform">
+          <span>未出貨${safeText(rec['來源平台']) ? ' · ' + escapeHtml(safeText(rec['來源平台'])) : ''}</span>
           <span class="pf-tag" style="background:var(--accent);">${fmtDate(rec['日期'])||''}</span>
         </div>
         <div class="pf-details">${detailHtml}</div>
         ${note ? `<div style="font-family:'Noto Sans TC','Klee One',serif;font-size:12px;color:var(--stamp-red);border-top:1px dotted var(--line);padding-top:6px;margin-bottom:6px;">📝 ${escapeHtml(note)}</div>` : ''}
         <div class="pf-actions">
           ${done
-            ? `<button class="btn small ghost" data-unsent-undone="${rec.id}">取消完成</button>`
-            : `<button class="btn small primary" data-unsent-done="${rec.id}">已出貨完成 ✓</button>`}
-          <button class="btn small ghost" data-unsent-del="${rec.id}">刪除</button>
+            ? `<span style="font-size:12px;color:var(--ink-soft);align-self:center;">完成物流：${escapeHtml(safeText(rec['完成物流'])||'黑貓')}</span>
+               <button class="btn small ghost" data-unsent-undone="${rec.id}">取消完成</button>`
+            : `
+               <button class="btn small primary" data-unsent-done="${rec.id}" data-done-logi="黑貓">黑貓出貨 ✓</button>
+               <button class="btn small primary" data-unsent-done="${rec.id}" data-done-logi="超商">超商出貨 ✓</button>`}
+         <button class="btn small ghost" data-unsent-del="${rec.id}">刪除</button>
         </div>
       </div>`;
   }).join('');
 
   list.querySelectorAll('[data-unsent-done]').forEach(b => {
-    b.addEventListener('click', async () => {
+    b.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const logi = b.dataset.doneLogi || '黑貓';
       try {
-        await api('updatePlatform', { id: b.dataset.unsentDone, '已完成': true, '完成日期': todayStr() });
-        toast('已標記出貨完成');
+        await api('updatePlatform', {
+          id: b.dataset.unsentDone,
+          '已完成': true,
+          '完成日期': todayStr(),
+          '完成物流': logi
+        });
+        toast(`已完成出貨（${logi}）`);
+        await loadAll();
+      } catch (err) { toast(err.message, true); }
+    });
+  });
+  list.querySelectorAll('[data-unsent-undone]').forEach(b => {
+    b.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      try {
+        await api('updatePlatform', {
+          id: b.dataset.unsentUndone,
+          '已完成': false,
+          '完成日期': '',
+          '完成物流': ''
+        });
+        toast('已取消完成');
         await loadAll();
       } catch (err) { toast(err.message, true); }
     });
@@ -1922,10 +1996,16 @@ function renderPlatformBoard() {
   const todayItems = state.platforms.filter(p => fmtDate(p['日期']) === today && p['平台'] !== '未出貨');
   const byPlatform = {};
   todayItems.forEach(p => { byPlatform[p['平台']] = p; });
+  // 今日有資料、但不在標準平台清單裡的平台（例如「其他」）也要顯示在公告
+  const boardNames = (() => {
+    const base = getBoardPlatformOrder();
+    const extra = Object.keys(byPlatform).filter(n => !base.includes(n));
+    return [...base, ...extra];
+  })();
 
   // 計算未完成且無備註者（可以一鍵完成的）
   let undoneCanBulk = 0;
-  getBoardPlatformOrder().forEach(name => {
+  boardNames.forEach(name => {
     const rec = byPlatform[name];
     if (rec && !isDone(rec['已完成'])) {
       const note = safeText(rec['備註']);
@@ -1940,11 +2020,11 @@ function renderPlatformBoard() {
     bulkBar.style.display = 'none';
   }
 
-  let visibleNames = getBoardPlatformOrder().filter(n => !hiddenPf.has(n + '|' + today));
-  const hiddenCount = getBoardPlatformOrder().length - visibleNames.length;
+  let visibleNames = boardNames.filter(n => !hiddenPf.has(n + '|' + today));
+  const hiddenCount = boardNames.length - visibleNames.length;
 
   // 排序：未完成有資料 → 未填寫 → 已完成；同組維持原順序
-  const baseOrder = getBoardPlatformOrder();
+  const baseOrder = boardNames;
   const rankOf = (name) => {
     const rec = byPlatform[name];
     if (!rec) return 1;                       // 未填寫
@@ -1986,12 +2066,25 @@ function renderPlatformBoard() {
         detailHtml = '<div style="text-align:center; padding: 4px 0; font-size: 12px;">無細項</div>';
       }
       const note = safeText(rec['備註']);
+      // 未出貨扣除：來源平台＝本平台、今天建立、尚未完成
+      const ded = unsentDeductFor(name, today);
+      let dedHtml = '';
+      if (ded.total > 0) {
+        const dedLines = Object.keys(ded.byLogi).map(l =>
+          `<div class="pf-line" style="color:var(--stamp-red);"><span>未出貨 ${escapeHtml(l)}</span><b>−${ded.byLogi[l]}</b></div>`
+        ).join('');
+        const net = (Number(rec['總件數'])||0) - ded.total;
+        dedHtml = `<div style="border-top:1px dotted var(--line);margin-top:2px;padding-top:2px;">
+            ${dedLines}
+            <div class="pf-line" style="font-weight:700;"><span>今日實出</span><b style="color:var(--stamp-blue);">${net}</b></div>
+          </div>`;
+      }
       return `
       <div class="pf-card ${isDone(rec['已完成']) ? 'done' : ''}" data-id="${rec.id}">
           <button class="card-hide-btn" data-hide-pf="${escapeAttr(hideKey)}" title="隱藏">×</button>
           <div class="pf-platform"><span>${name}</span></div>
           <div class="pf-total"><span class="label">總</span>${rec['總件數']||0}</div>
-          <div class="pf-details">${detailHtml}</div>
+          <div class="pf-details">${detailHtml}${dedHtml}</div>
          ${note ? `<div style="font-family:'Noto Sans TC','Klee One',serif;font-size:12px;color:var(--stamp-red);border-top:1px dotted var(--line);padding-top:6px;margin-bottom:6px;">📝 ${escapeHtml(note)}</div>` : ''}
         <div class="pf-actions">
 ${isDone(rec['已完成'])
@@ -2008,7 +2101,7 @@ ${isDone(rec['已完成'])
   if (hiddenCount > 0) {
     toggle.innerHTML = `<button id="pfShowHidden">顯示已隱藏的 ${hiddenCount} 個</button>`;
    $('#pfShowHidden').addEventListener('click', () => {
-      getBoardPlatformOrder().forEach(n => hiddenPf.delete(n + '|' + today));
+      boardNames.forEach(n => hiddenPf.delete(n + '|' + today));
       saveHidden();
       renderPlatformBoard();
     });
@@ -3425,6 +3518,29 @@ function renderPlatformForm(force) {
   });
 
   area.innerHTML = '<div class="pf-form">' + getPlatformOrder().map(name => {
+
+    if (name === '未出貨') {
+      const platOpts = getPlatformOrder().filter(n => n !== '未出貨')
+        .map(n => `<option value="${escapeAttr(n)}">${escapeHtml(n)}</option>`).join('');
+      return `
+      <div class="pf-form-card" data-platform="未出貨" style="border-left-color: var(--stamp-red);">
+        <div class="pf-form-head">
+          <span class="pf-name">未出貨</span>
+          <span class="pf-sum">小計 <b data-sum="未出貨">0</b></span>
+        </div>
+        <div style="font-size:12px;color:var(--ink-soft);margin:2px 0 10px;letter-spacing:1px;">✦ 每次送出都會新增一筆，可累計多筆</div>
+        <div class="field" style="margin-bottom:12px;">
+          <label>未出貨平台</label>
+          <select id="unsent_platform"><option value="">—</option>${platOpts}</select>
+        </div>
+        <div class="pf-inputs" id="unsent_logi_inputs">
+          <div style="grid-column:1/-1;text-align:center;color:var(--ink-soft);font-size:13px;padding:8px 0;">請先選擇平台</div>
+        </div>
+        <div class="pf-form-note">
+          <input type="text" class="pf-note-input" data-pf="未出貨" placeholder="補充備註（選填，會接在自動備註後）">
+        </div>
+      </div>`;
+    }
     const opts     = getPlatformLogistics()[name] || [];
     // 未出貨每次送出都新增一筆，故表單永遠空白、不回填
     const existing = (name === '未出貨') ? null : todayRecs[name];
@@ -3517,6 +3633,53 @@ area.querySelectorAll('.pf-num-btn').forEach(btn => {
 });
 
   getPlatformOrder().forEach(updatePfSum);
+  // 未出貨：選平台 → 帶出該平台物流欄位
+  (function bindUnsent() {
+    const sel  = document.getElementById('unsent_platform');
+    const wrap = document.getElementById('unsent_logi_inputs');
+    if (!sel || !wrap) return;
+
+    const numBtns = `
+      <div class="pf-num-btns">
+        <button type="button" class="pf-num-btn" data-delta="1">+1</button>
+        <button type="button" class="pf-num-btn" data-delta="5">+5</button>
+        <button type="button" class="pf-num-btn" data-delta="10">+10</button>
+        <button type="button" class="pf-num-btn" data-delta="50">+50</button>
+        <button type="button" class="pf-num-btn clear" data-clear="1">清除</button>
+      </div>`;
+
+    function build(platform) {
+      const opts = getPlatformLogistics()[platform] || [];
+      if (!platform) {
+        wrap.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--ink-soft);font-size:13px;padding:8px 0;">請先選擇平台</div>`;
+      } else if (!opts.length) {
+        wrap.innerHTML = `<div class="field"><label>總件數</label><input type="number" min="0" class="pf-input" data-pf="未出貨" data-logi="__total__">${numBtns}</div>`;
+      } else {
+        wrap.innerHTML = opts.map(opt => `
+          <div class="field"><label>${escapeHtml(opt)}</label>
+            <input type="number" min="0" class="pf-input" data-pf="未出貨" data-logi="${escapeAttr(opt)}">${numBtns}
+          </div>`).join('');
+      }
+      wrap.querySelectorAll('.pf-input').forEach(inp => {
+        inp.addEventListener('input', () => updatePfSum('未出貨'));
+      });
+      wrap.querySelectorAll('.pf-num-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const field = btn.closest('.field');
+          const inp = field && field.querySelector('.pf-input');
+          if (!inp) return;
+          if (btn.dataset.clear) inp.value = '';
+          else inp.value = Math.max(0, (Number(inp.value)||0) + (Number(btn.dataset.delta)||0)) || '';
+          updatePfSum('未出貨');
+        });
+      });
+      updatePfSum('未出貨');
+    }
+
+    sel.addEventListener('change', () => build(sel.value));
+    build(sel.value);
+  })();
 // 新增平台（一步完成）
   const inlineAddBtn  = document.getElementById('inline_pm_add');
   const inlineNameInp = document.getElementById('inline_pm_name');
@@ -3615,7 +3778,7 @@ function updatePfSum(name) {
 
 function resetPlatformForm() {
   $('#p_date').value        = todayStr();
-  renderPlatformForm();
+  renderPlatformForm(true);
 }
 
 $('#p_date').addEventListener('change', renderPlatformForm);
@@ -3623,12 +3786,37 @@ $('#pReset').addEventListener('click', resetPlatformForm);
 
 $('#pSubmit').addEventListener('click', async () => {
   if (!API_URL) { toast('請先設定 API 網址', true); return; }
-  const date = $('#p_date').value;
+ const date = $('#p_date').value;
   if (!date)  { toast('請選日期', true); return; }
+
+  // 未出貨：有填件數就一定要選平台
+  const unsentSel = document.getElementById('unsent_platform');
+  const unsentTotal = Array.from(document.querySelectorAll('.pf-input[data-pf="未出貨"]'))
+    .reduce((s, inp) => s + (Number(inp.value) || 0), 0);
+  if (unsentTotal > 0 && !(unsentSel && unsentSel.value)) {
+    toast('未出貨請先選擇平台', true);
+    return;
+  }
+
   const globalNote = '';
   const items = [];
 
   getPlatformOrder().forEach(name => {
+    if (name === '未出貨') {
+      const srcPlatform = unsentSel ? unsentSel.value : '';
+      let detail = [], total = 0;
+      document.querySelectorAll('.pf-input[data-pf="未出貨"]').forEach(inp => {
+        const n = Number(inp.value) || 0;
+        total += n;
+        if (n > 0 && inp.dataset.logi !== '__total__') {
+          detail.push({ 物流: inp.dataset.logi, 件數: n });
+        }
+      });
+      if (total <= 0) return;
+      const note = (document.querySelector('.pf-note-input[data-pf="未出貨"]')?.value || '').trim();
+      items.push({ 平台: '未出貨', 明細: detail, 總件數: total, 備註: note, 來源平台: srcPlatform });
+      return;
+    }
     const opts = getPlatformLogistics()[name] || [];
     let detail = [], total = 0;
     if (!opts.length) {
@@ -3667,13 +3855,13 @@ $('#pSubmit').addEventListener('click', async () => {
         await api('updatePlatform', { id: exist.id, '明細': item.明細, '總件數': item.總件數, '備註': note });
         updated++;
       } else {
-        await api('addPlatform', { '日期': date, '平台': item.平台, '明細': item.明細, '總件數': item.總件數, '備註': note });
+        await api('addPlatform', { '日期': date, '平台': item.平台, '明細': item.明細, '總件數': item.總件數, '備註': note, '來源平台': item.來源平台 || '' });
         added++;
       }
     }
     toast(`已送出 ${added + updated} 筆`);
     await loadAll();
-    renderPlatformForm();
+    renderPlatformForm(true);  // 強制重建＝清空
     switchTab('board');
   } catch (e) {
     toast(e.message, true);
